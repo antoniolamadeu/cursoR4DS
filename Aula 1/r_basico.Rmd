@@ -1,5 +1,5 @@
 ---
-title: "R base"
+title: "R base"@
 author: "Curso R"
 date: "16 de setembro de 2017"
 output: ioslides_presentation
