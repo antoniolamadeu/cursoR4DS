@@ -11,13 +11,77 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Importação 
 
+### Excel
+
+```{r}
+# BD: excel com (.) como separador decimal
+dados <- readxl::read_excel("Aula 1/data/bdc.xls", na = c("", "NT", "NA"))
+
+str(dados)
+```
+
+```{r}
+# Colocando o tipo das variáveis na mão
+dados <- readxl::read_excel("Aula 1/data/bdc.xls",
+na = c("", "NT", "NA"),
+col_types = c("text",
+"date",
+"guess",
+"date",
+"text",
+rep("numeric", 4),
+"text",
+rep("numeric", 2),
+"text",
+rep("numeric", 2),
+"text",
+"text"))
+```
+
 ### CSV
+
+```{r}
+# BD: csv com (;) e (,) como separador decimal
+dados <- readr::read_csv2("Aula 1/data/bdc.csv",
+na = c("", "NT", "NA"))
+```
+
+### TAB Delim
+
+```{r}
+# BD: texto delimitado por tabulação
+dados <- readr::read_delim("Aula 1/data/bdc.txt", delim = "\t")
+```
 
 ### SQL
 
-<!-- Dani vai colocar aqui -->
+```{r}
+# Criar um banco de dados SQLite
 
+mydb <- dbConnect(RSQLite::SQLite(), "my-db.sqlite")
+
+dbWriteTable(mydb, "mtcars", mtcars)
+dbGetQuery(mydb, 'SELECT * FROM mtcars LIMIT 5')
+dbGetQuery(mydb, 'select * from mtcars where drat > 4')
+```
+
+# Mais opções
+
+- https://github.com/rstats-db
+- http://db.rstudio.com/
+
+```{r}
+con <- dbConnect(odbc::odbc(),
+                 Driver   = "[your driver's name]",
+                 Server   = "[your server's path]",
+                 Database = "[your database's name]",
+                 UID      = rstudioapi::askForPassword("Database user"),
+                 PWD      = rstudioapi::askForPassword("Database password"),
+                 Port     = 1433)
 ## Data wrangling
+```
+
+## Data Wrangling
 
 ```{r, echo=FALSE}
 knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/diagrams/data-science.png")
@@ -40,25 +104,40 @@ d_infos <- readr::read_rds("data/infos_processos.rds")
 ```
 
 ```{r, eval = FALSE}
-A <- dataset %>% 
+dataset <- readr::read_rds("data/d_cposg.rds")
+
+informacoes <- dataset %>% 
   select(id, data) %>% 
   unnest(data) %>% 
   spread(data, value) %>% 
   janitor::clean_names() %>% 
   abjutils::rm_accent_from_names()
 
-B <- dataset %>% 
+decisoes <- dataset %>% 
   select(id, decisions) %>% 
   unnest(decisions) %>% 
   group_by(id) %>%
   filter(date == max(date))
 
-d_infos <- A %>% 
-  inner_join(B) %>% 
-  filter(area == "Criminal", !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial")) %>% 
+movs <- dataset %>% 
+  select(id, movs) %>% 
+  unnest(movs) %>% 
+  group_by(id) %>% 
+  summarise(data_dist = min(movement))
+
+d_infos <- informacoes %>% 
+  inner_join(decisoes) %>% 
+  inner_join(movs) %>% 
+  filter(area == "Criminal",
+         !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
+         situacao %in% c("Encerrado", "Julgado", "Transitado")
+         # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
+         ) %>% 
   select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
   rename(data_ultima_decisao = date,
-         decisao = decision)
+         decisao = decision) %>% 
+  mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y"),
+         data_dist = format(data_dist, "%d/%m/%Y"))
 
 saveRDS(d_infos, 'data/infos_processos.rds')
 ```
@@ -142,6 +221,140 @@ d_infos %>%
 Separe a coluna "origem" em quantos pedaços for necessário.
 
 Dica: Existe uma função no pacote `tidyr` que faz isso.
+
+
+
+
+<!-- Gabarito virá do Dani -->
+
+
+## Datas
+
+```{r}
+library(lubridate)
+
+d_infos %>% 
+  mutate(data_dist = dmy(data_dist),
+         dia_dist = day(data_dist),
+         mes_dist = month(data_dist),
+         ano_dist = year(data_dist))
+```
+
+## Exercício
+
+Cria a variável duração do processo.
+
+## Construíndo a variável resposta
+
+O R básico não tem uma sintaxe consistente para trabalhar com textos.
+O pacote `stringr` ajuda a realizar todas as tarefas básicas de manipulação de texto,
+exigindo que o usuário estude apenas uma sintaxe.
+O `stringr` também é construído sobre a [biblioteca ICU](http://site.icu-project.org/),
+implementada em `C` e `C++`, 
+apresentando resultados rápidos e confiáveis.
+
+As regras básicas do pacote são:
+
+- As funções de manipulação de texto começam com `str_`. Caso esqueça o nome de uma função, basta digitar `stringr::str_` e apertar `TAB` para ver quais são as opções.
+- O primeiro argumento da função é sempre uma `string`.
+
+Antes de listar as funções, 
+precisamos estudar o básico de 
+expressões regulares.
+
+### Expressões regulares
+
+Expressão regular ou *regex* é uma sequência concisa de caracteres que representa várias strings. Entender o básico de expressões regulares é indispensável para trabalhar com textos.
+
+Vamos estudar expressões regulares através de exemplos e com a função `str_detect()`. Essa função retorna `TRUE` se uma string atende à uma expressão regular e `FALSE` em caso contrário.
+
+A tabela abaixo mostra a aplicação de seis `regex` a seis strings distintas.
+
+```{r}
+library(stringr)
+testes <- c('ban', 'banana', 'abandonado', 'pranab anderson', 'BANANA', 'ele levou ban')
+
+expressoes <- list(
+  'ban', # reconhece tudo que tenha "ban", mas não ignora case
+  'BAN', # reconhece tudo que tenha "BAN", mas não ignora case
+  regex('ban', ignore_case = TRUE), # reconhece tudo que tenha "ban", ignorando case
+  'ban$', # reconhece apenas o que termina exatamente em "ban"
+  '^ban', # reconhece apenas o que começa exatamente com "ban"
+  'b ?an' # reconhece tudo que tenha "ban", com ou sem espaço entre o "b" e o "a"
+)
+```
+
+```{r echo=FALSE}
+purrr::map(testes, ~str_detect(testes, .x)) %>% 
+  {do.call(rbind, .)} %>% 
+  as.data.frame() %>% 
+  setNames(testes) %>% 
+  dplyr::mutate(regex = expressoes) %>% 
+  dplyr::select(regex, dplyr::everything()) %>% 
+  knitr::kable()
+```
+
+### Insumo da variável resposta
+
+- Três resultados possíveis: provido, parcialmente provido, improvido
+- A votação pode ser unânime (V.U.) ou não 
+
+```{r}
+#Começando do mais fácil
+
+d_infos <- d_infos %>% 
+  mutate(voto_unanime = str_detect(decisao, "V\\.U\\."))
+```
+
+```{r}
+# Essa é uma regex ruim!
+
+d_infos %>% 
+  filter(!voto_unanime) %>%
+  View
+```
+
+```{r}
+d_infos <- d_infos %>% 
+  mutate(voto_unanime = str_detect(decisao, regex("V\\.? ?U\\.?", ignore_case = T)))
+```
+
+```{r}
+# Ainda não funcionou! Olhe a linha 10.
+d_infos %>% 
+  filter(!voto_unanime) %>%
+  View
+```
+
+```{r}
+d_infos <- d_infos %>% 
+  mutate(voto_unanime = str_detect(decisao, regex("unanim|V\\.? ?U\\.?", ignore_case = T)))
+```
+
+```{r}
+# Ainda não funcionou! Olhe a linha 17.
+d_infos %>% 
+  filter(!voto_unanime) %>%
+  View
+```
+
+```{r}
+d_infos <- d_infos %>% 
+  mutate(decisao = rslp:::remove_accents(decisao), 
+    voto_unanime = str_detect(decisao, regex("unanim|V\\.? ?U\\.?", ignore_case = T)))
+```
+
+```{r}
+d_infos %>% 
+  filter(!voto_unanime) %>%
+  View
+```
+
+
+
+
+
+
 
 
 
