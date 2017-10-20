@@ -638,6 +638,10 @@ d_infos %>%
 ```
 
 
+# Exercícios:
 
+1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
+2) Dependendo do assunto do processo a duração é diferente?
+3) A distribuição de providos é diferente entre os foros da comarca de São Paulo?
 
 
