@@ -427,6 +427,36 @@ Dica: Explore a coluna `decisao` nos casos em que a regex acima classifcou como 
 
 
 
+
+
+
+
+
+
+
+
+### Solução 1
+
+```{r}
+regex_parcialmente_provido <- "parcial provimento|provimento em parte|provimento parcial"
+regex_provido <- "recurso provido|^deram provimento"
+regex_nao_provido <- "negaram provimento|nega-se provimento"
+
+d_infos <- d_infos %>%
+mutate(decisao = stringr::str_to_lower(decisao),
+decisao = rslp:::remove_accents(decisao),
+resultado = case_when(
+stringr::str_detect(decisao, regex_parcialmente_provido) ~ "Parcialmente Provido",
+stringr::str_detect(decisao, regex_provido) ~ "Provido",
+stringr::str_detect(decisao, regex_nao_provido) ~ "Improvido",
+TRUE ~ "Outros"
+))
+```
+
+
+
+
+
 ```{r}
   regex_parcialmente_provido <- "parcial provimento|provimento em parte|provimento parcial"
   regex_provido <- "recurso provido|deram provimento (ao|a)|mantiveram o|recursos?( e remessas?( necessaria)? ?)? conhecidos e providos"
