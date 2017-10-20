@@ -15,14 +15,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # BD: excel com (.) como separador decimal
-dados <- readxl::read_excel("Aula 1/data/bdc.xls", na = c("", "NT", "NA"))
+dados <- readxl::read_excel("../Aula 1/data/bdc.xls", na = c("", "NT", "NA"))
 
 str(dados)
 ```
 
-```{r}
+```{r, message=FALSe, error=FALSE, warning=FALSE}
 # Colocando o tipo das variáveis na mão
-dados <- readxl::read_excel("Aula 1/data/bdc.xls",
+dados <- readxl::read_excel("../Aula 1/data/bdc.xls",
 na = c("", "NT", "NA"),
 col_types = c("text",
 "date",
@@ -42,7 +42,7 @@ rep("numeric", 2),
 
 ```{r}
 # BD: csv com (;) e (,) como separador decimal
-dados <- readr::read_csv2("Aula 1/data/bdc.csv",
+dados <- readr::read_csv2("../Aula 1/data/bdc.csv",
 na = c("", "NT", "NA"))
 ```
 
@@ -50,12 +50,12 @@ na = c("", "NT", "NA"))
 
 ```{r}
 # BD: texto delimitado por tabulação
-dados <- readr::read_delim("Aula 1/data/bdc.txt", delim = "\t")
+dados <- readr::read_delim("../Aula 1/data/bdc.txt", delim = "\t")
 ```
 
 ### SQL
 
-```{r}
+```{r, eval = FALSE}
 # Criar um banco de dados SQLite
 
 mydb <- dbConnect(RSQLite::SQLite(), "my-db.sqlite")
@@ -70,7 +70,7 @@ dbGetQuery(mydb, 'select * from mtcars where drat > 4')
 - https://github.com/rstats-db
 - http://db.rstudio.com/
 
-```{r}
+```{r, eval = FALSE}
 con <- dbConnect(odbc::odbc(),
                  Driver   = "[your driver's name]",
                  Server   = "[your server's path]",
@@ -125,10 +125,13 @@ movs <- dataset %>%
   group_by(id) %>% 
   summarise(data_dist = min(movement))
 
+processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
+
 d_infos <- informacoes %>% 
   inner_join(decisoes) %>% 
   inner_join(movs) %>% 
   filter(area == "Criminal",
+         id %in% processos,
          !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
          situacao %in% c("Encerrado", "Julgado", "Transitado")
          # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
@@ -225,7 +228,12 @@ Dica: Existe uma função no pacote `tidyr` que faz isso.
 
 
 
-<!-- Gabarito virá do Dani -->
+```{r}
+d_infos %>%
+tidyr::separate(col = origem,
+into = c("Comarca", "Foro", "Vara"),
+sep = " / ")
+```
 
 
 ## Datas
@@ -243,6 +251,17 @@ d_infos %>%
 ## Exercício
 
 Cria a variável duração do processo.
+
+
+
+
+
+
+```{r}
+d_infos %>%
+mutate(duracao = dmy(data_ultima_decisao) - dmy(data_dist),
+duracao = as.numeric(duracao))
+```
 
 ## Construíndo a variável resposta
 
@@ -403,7 +422,8 @@ Dica: Explore a coluna `decisao` nos casos em que a regex acima classifcou como 
              stringr::str_detect(decisao, regex_nao_provido) ~ "Improvido",
              stringr::str_detect(decisao, regex_nao_conheceram) ~ "Não Conheceram",
              TRUE ~ "Outros"
-           ))
+           ),
+           decisao_binaria = ifelse(resultado == "Improvido", "Improvido", "Provido"))
 ```
 
 
@@ -413,7 +433,31 @@ d_infos %>%
   View
 ```
 
-## Análises descritivas
+## Análises descritivas das explicativas versus a resposta
 
+```{r}
+d_infos %>% 
+  count(decisao_binaria, assunto_geral) %>% 
+  ggplot(aes(y = n, x = assunto_geral, fill = decisao_binaria)) +
+  geom_bar(stat = 'identity', position = 'fill')
+```
+
+```{r}
+d_infos %>% 
+    count(decisao_binaria, extraordinaria) %>% 
+    ggplot(aes(y = n, x = extraordinaria,
+               fill = decisao_binaria)) +
+    geom_bar(stat = 'identity', position = 'fill')
+```
+
+```{r}
+d_infos %>%
+mutate(duracao = dmy(data_ultima_decisao) - dmy(data_dist),
+duracao = as.numeric(duracao),
+       duracao = cut(duracao, breaks = 10, include.lowest = T)) %>% 
+  count(decisao_binaria, duracao) %>% 
+  ggplot(aes(y = n, x = duracao, fill = decisao_binaria)) +
+    geom_bar(stat = 'identity', position = 'fill')
+```
 
 
