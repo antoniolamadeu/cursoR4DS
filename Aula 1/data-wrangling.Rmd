@@ -122,14 +122,15 @@ decisoes <- dataset %>%
 movs <- dataset %>% 
   select(id, movs) %>% 
   unnest(movs) %>% 
-  group_by(id) %>% 
-  summarise(data_dist = min(movement))
+  mutate(movement = format(movement, "%d/%m/%Y"))
+  #group_by(id) %>% 
+  #Wsummarise(data_dist = min(movement))
 
 processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
 
 d_infos <- informacoes %>% 
   inner_join(decisoes) %>% 
-  inner_join(movs) %>% 
+  #inner_join(movs) %>% 
   filter(area == "Criminal",
          id %in% processos,
          !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
@@ -139,10 +140,12 @@ d_infos <- informacoes %>%
   select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
   rename(data_ultima_decisao = date,
          decisao = decision) %>% 
-  mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y"),
-         data_dist = format(data_dist, "%d/%m/%Y"))
+  mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y")
+         #data_dist = format(data_dist, "%d/%m/%Y")
+  )
 
 saveRDS(d_infos, 'data/infos_processos.rds')
+saveRDS(movs,  'data/movs_processos.rds')
 ```
 
 ### Diagnóstico das variáveis
@@ -235,6 +238,24 @@ into = c("Comarca", "Foro", "Vara"),
 sep = " / ")
 ```
 
+## Joins
+
+```{r}
+d_movs <- readRDS("../Aula 1/data/movs_processos.rds")
+```
+
+```{r}
+datas_de_distribuicao <- d_movs %>% 
+  mutate(movement = dmy(movement)) %>% 
+  group_by(id) %>% 
+  summarise(data_dist = min(movement))
+```
+
+```{r}
+d_infos <- d_infos %>% 
+  inner_join(datas_de_distribuicao)
+```
+
 
 ## Datas
 
@@ -242,8 +263,7 @@ sep = " / ")
 library(lubridate)
 
 d_infos %>% 
-  mutate(data_dist = dmy(data_dist),
-         dia_dist = day(data_dist),
+  mutate(dia_dist = day(data_dist),
          mes_dist = month(data_dist),
          ano_dist = year(data_dist))
 ```
