@@ -9,6 +9,14 @@ output: ioslides_presentation
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Pacotes
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(stringr)
+```
+
 ## Importação 
 
 ### Excel
@@ -156,9 +164,6 @@ saveRDS(movs,  'data/movs_processos.rds')
 
 - Algumas variáveis contém muita informação bruta, que não está no melhor formato possível
 
-
-
-
 ### Assunto
 
 - Existem três níveis de assunto do processo que estão codificadas na coluna assunto
@@ -170,7 +175,13 @@ d_infos %>%
 
 ```{r}
 d_infos <- d_infos %>% 
-  separate(assunto, into = c("assunto_geral", "assunto_intermediario", "assunto"), sep = "-", extra = 'merge', fill = 'right')
+  separate(
+    col = assunto, 
+    into = c("assunto_geral", "assunto_intermediario", "assunto"), 
+    sep = "-", 
+    extra = 'merge', 
+    fill = 'right'
+  )
 ```
 
 ```{r}
@@ -191,12 +202,12 @@ d_infos %>%
 Tirando espaços indevidos:
 
 ```{r}
-library(stringr)
-
 d_infos <- d_infos %>% 
-  mutate(assunto_geral = str_trim(assunto_geral),
-         assunto_intermediario = str_trim(assunto_intermediario),
-         assunto = str_trim(assunto))
+  mutate(
+    assunto_geral = str_trim(assunto_geral),
+    assunto_intermediario = str_trim(assunto_intermediario),
+    assunto = str_trim(assunto)
+  )
 ```
 
 ## Comarca
@@ -231,11 +242,25 @@ Dica: Existe uma função no pacote `tidyr` que faz isso.
 
 
 
+
+
+
+
+
 ```{r}
+d_infos <- d_infos %>%
+  separate(col = origem,
+                  into = c("Comarca", "Foro", "Vara"),
+                  sep = " / ")
+
 d_infos %>%
-tidyr::separate(col = origem,
-into = c("Comarca", "Foro", "Vara"),
-sep = " / ")
+  count(Comarca, sort = TRUE)
+
+d_infos %>%
+  count(Foro, sort = TRUE)
+
+d_infos %>%
+  count(Vara, sort = TRUE)
 ```
 
 ## Joins
@@ -254,6 +279,10 @@ datas_de_distribuicao <- d_movs %>%
 ```{r}
 d_infos <- d_infos %>% 
   inner_join(datas_de_distribuicao)
+
+# equivalente a explicitamente adicionar o `by`.
+# d_infos <- d_infos %>% 
+#   inner_join(datas_de_distribuicao, by = "id")
 ```
 
 
@@ -262,7 +291,7 @@ d_infos <- d_infos %>%
 ```{r}
 library(lubridate)
 
-d_infos %>% 
+d_infos <- d_infos %>% 
   mutate(dia_dist = day(data_dist),
          mes_dist = month(data_dist),
          ano_dist = year(data_dist))
@@ -270,7 +299,37 @@ d_infos %>%
 
 ## Exercício
 
-Cria a variável duração do processo.
+1) Criar a variável duração do processo.
+
+
+
+
+
+
+```{r}
+d_infos <- d_infos %>%
+  mutate(duracao = dmy(data_ultima_decisao) - data_dist,
+         duracao = as.numeric(duracao))
+
+
+# ou usar o seguinte:
+d_infos <- d_infos %>%
+  mutate(
+    duracao = difftime(data_ultima_decisao, data_dist, units = "days"),
+    duracao = as.numeric(duracao)
+    )
+# 
+# units = c("auto", "secs", "mins", "hours",
+#                    "days", "weeks")
+
+```
+
+2) Fazer um gráfico da quantidade de decisões por dia
+
+
+
+
+
 
 
 
@@ -279,9 +338,36 @@ Cria a variável duração do processo.
 
 ```{r}
 d_infos %>%
-mutate(duracao = dmy(data_ultima_decisao) - dmy(data_dist),
-duracao = as.numeric(duracao))
+  group_by(data_ultima_decisao) %>%
+  summarise(qtd = n()) %>%
+  ggplot(aes(x = dmy(data_ultima_decisao), y = qtd)) +
+  geom_line() +
+  scale_x_date(limits = dmy(c("01-10-2016", "01-01-2017")))
 ```
+
+3) Qual é o dia da semana com mais distribuições? Faça um gráfico. Dica: Veja as funções do 
+lubridate.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+d_infos %>%
+  mutate(dia_da_semana = wday(data_dist, label = TRUE)) %>%
+  ggplot() + 
+  geom_bar(aes(x = dia_da_semana))
+```
+
 
 ## Construíndo a variável resposta
 
@@ -508,6 +594,12 @@ duracao = as.numeric(duracao),
   count(decisao_binaria, duracao) %>% 
   ggplot(aes(y = n, x = duracao, fill = decisao_binaria)) +
     geom_bar(stat = 'identity', position = 'fill')
+```
+
+
+
+```{r}
+d_infos %>% count(relator)
 ```
 
 
