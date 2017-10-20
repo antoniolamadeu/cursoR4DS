@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::include_graphics("foto_curso_r2.jpg")
 ```
 
-## Ciência de dados
+## Ci�ncia de dados
 
 ```{r, echo=FALSE, fig.align='center', fig.width=4, fig.height=4}
 knitr::include_graphics("bigdata2.png")
@@ -36,7 +36,7 @@ knitr::include_graphics("bigdata2.png")
 
 ## Papel do R
 
-R é a grande cola.
+R � a grande cola.
 
 **Exemplo:** Tensorflow, feito em Python, chamado no R pelo pacote keras.
 
@@ -46,10 +46,9 @@ library(keras)
 modelo <- keras_model(input = 1)
 ```
 
-
 ## Nosso curso
 
-16/09 - Introdução + R base - Fernando 
+16/09 - Introdu��o + R base - Fernando 
 
 16/09 - Vetores + R base - Athos
 
@@ -71,7 +70,7 @@ knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/di
 
 ## Nosso curso
 
-O material do curso está disponível nessa página (em desenvolvimento):
+O material do curso está dispon�vel nessa página (em desenvolvimento):
 
 http://material.curso-r.com/
 
@@ -79,21 +78,13 @@ Também temos um blog:
 
 http://curso-r.com/blog/
 
-<!-- ## Público-alvo -->
 
-<!-- - Estudantes de graduação em estatística que desejam ganhar tempo nos trabalhos da faculdade e entrar no mercado de trabalho com bons diferenciais. -->
+## Din�mica
 
-<!-- - Profissionais do mercado de trabalho que desejam inserir o R no fluxo de atividades do setor/empresa. -->
-
-<!-- - Acadêmicos com interesse em tornar suas análises e códigos mais legíveis, reprodutíveis, eficientes e organizados. -->
-
-
-## Dinâmica das aulas
-
-- Almoço às 12h.
+- Almo�o �s 12h.
 - Aulas expositivas em blocos de 3h.
-- Exercícios ao decorrer e no final das aulas.
-- Leituras e exercícios complementares e opcionais fora da sala de aula.
+- Exerc�cios ao decorrer e no final das aulas.
+- Leituras e exerc�cios complementares e opcionais fora da sala de aula.
 
 <!-- ## Requisitos básicos  -->
 
@@ -111,50 +102,13 @@ http://curso-r.com/blog/
 
 ## Não vamos falar de
 
-- Modelagem estatística (regressões, testes estatísticos, clustering, componentes principais)
+- Modelagem estat�stica (regressões, testes estat�sticos, clustering, componentes principais)
 
-- Gráficos dinâmicos e dashboards (Shiny, htmlwidgets)
+- Gr�ficos din�micos e dashboards (Shiny, htmlwidgets)
 
-- Programação eficiente com R (paralelização, *profiling*, `Rcpp`)
+- Programação eficiente com R (paraleliza��o, *profiling*, `Rcpp`)
 
-- Não vamos nos aprofundar em "big data" (Spark, Hadoop, MongoDB, TensorFlow)
-
-
-
-
-
-
-
-## Diferenças entre C/C++ e R
-
-- `C`: eficiência e transparência, 
-- `R`: é análise de dados e interatividade. 
-
-Isso faz com que as duas linguagens sejam bem diferentes!
-
-Na prática, temos que
-
-- C é compilável, R é uma linguagem script.
-- R é uma linguagem funcional. Por exemplo, `(`, `&` e `+` são funções do R.
-
-
-## Diferenças entre C/C++ e R
-
-- R é vetorizado. Observe:
-
-```{r}
-a <- c(1, 2, 3)
-b <- c(1, 2, 3, 4, 5, 6)
-a + b 
-```
-
-Você raramente usará loops (`for`, `while`) no R.
-
-
-
-
-
-
+- N�o vamos nos aprofundar em "big data" (Spark, Hadoop, MongoDB, TensorFlow)
 
 ## Tidyverse
 

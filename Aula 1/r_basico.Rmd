@@ -4,7 +4,7 @@ author: "Curso R"
 date: "16 de setembro de 2017"
 output: ioslides_presentation
 ---
-00
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```

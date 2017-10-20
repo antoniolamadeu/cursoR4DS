@@ -1,0 +1,30 @@
+---
+title: "Data Wrangling"
+author: "Curso R"
+date: "16 de setembro de 2017"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Importação 
+
+### CSV
+
+### SQL
+
+<!-- Dani vai colocar aqui -->
+
+## Data wrangling
+
+```{r, echo=FALSE}
+knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/diagrams/data-science.png")
+```
+
+### Exercício 
+
+Carregue o conteúdo do arquivo `data/d_cpopg.rds` num objeto chamado `dataset`.
+
+Dica: O pacote `readr` tem uma ampla gama de funções 
