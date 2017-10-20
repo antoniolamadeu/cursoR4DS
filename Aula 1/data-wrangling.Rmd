@@ -25,6 +25,121 @@ knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/di
 
 ### Exercício 
 
-Carregue o conteúdo do arquivo `data/d_cpopg.rds` num objeto chamado `dataset`.
+Carregue o conteúdo do arquivo `data/infos_processos.rds` num objeto chamado `d_infos`.
 
-Dica: O pacote `readr` tem uma ampla gama de funções 
+Dica: O pacote `readr` tem uma ampla gama de funções para importação de dados.
+
+
+
+
+
+
+
+```{r}
+d_infos <- readr::read_rds("data/infos_processos.rds")
+```
+
+```{r, eval = FALSE}
+A <- dataset %>% 
+  select(id, data) %>% 
+  unnest(data) %>% 
+  spread(data, value) %>% 
+  janitor::clean_names() %>% 
+  abjutils::rm_accent_from_names()
+
+B <- dataset %>% 
+  select(id, decisions) %>% 
+  unnest(decisions) %>% 
+  group_by(id) %>%
+  filter(date == max(date))
+
+d_infos <- A %>% 
+  inner_join(B) %>% 
+  filter(area == "Criminal", !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial")) %>% 
+  select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
+  rename(data_ultima_decisao = date,
+         decisao = decision)
+
+saveRDS(d_infos, 'data/infos_processos.rds')
+```
+
+### Diagnóstico das variáveis
+
+<!-- Athos que vai fazer -->
+
+## Arrumando a casa
+
+- Algumas variáveis contém muita informação bruta, que não está no melhor formato possível
+
+
+
+
+### Assunto
+
+- Existem três níveis de assunto do processo que estão codificadas na coluna assunto
+
+```{r}
+d_infos %>% 
+  count(assunto)
+```
+
+```{r}
+d_infos <- d_infos %>% 
+  separate(assunto, into = c("assunto_geral", "assunto_intermediario", "assunto"), sep = "-", extra = 'merge', fill = 'right')
+```
+
+```{r}
+d_infos %>% 
+  count(assunto_geral)
+# Por que o mesmo assunto aparece duas vezes? Descubram!
+
+d_infos %>% 
+  count(assunto_intermediario)
+# Por que o mesmo assunto aparece duas vezes? Descubram!
+
+d_infos %>% 
+  count(assunto)
+# Por que o mesmo assunto aparece duas vezes? Descubram!
+
+```
+
+Tirando espaços indevidos:
+
+```{r}
+library(stringr)
+
+d_infos <- d_infos %>% 
+  mutate(assunto_geral = str_trim(assunto_geral),
+         assunto_intermediario = str_trim(assunto_intermediario),
+         assunto = str_trim(assunto))
+```
+
+## Comarca
+
+```{r}
+d_infos %>% 
+  count(distribuicao)
+# Existem subgrupos de câmaras que queremos agrupar
+```
+
+```{r}
+# Vamos criar novas variáveis
+d_infos <- d_infos %>% 
+  mutate(extraordinaria = str_detect(distribuicao, "Extraordinária"),
+         grupo = str_detect(distribuicao, "Grupo"))
+```
+
+```{r}
+d_infos %>% 
+  count(grupo)
+
+d_infos %>% 
+  count(extraordinaria)
+```
+
+## Exercício 
+
+Separe 
+
+
+
