@@ -139,7 +139,9 @@ d_infos %>%
 
 ## Exercício 
 
-Separe 
+Separe a coluna "origem" em quantos pedaços for necessário.
+
+Dica: Existe uma função no pacote `tidyr` que faz isso.
 
 
 
