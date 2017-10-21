@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::include_graphics("foto_curso_r2.jpg")
 ```
 
-## Ci�ncia de dados
+## Ciência de dados
 
 ```{r, echo=FALSE, fig.align='center', fig.width=4, fig.height=4}
 knitr::include_graphics("bigdata2.png")
@@ -36,7 +36,7 @@ knitr::include_graphics("bigdata2.png")
 
 ## Papel do R
 
-R � a grande cola.
+R é a grande cola.
 
 **Exemplo:** Tensorflow, feito em Python, chamado no R pelo pacote keras.
 
@@ -48,7 +48,7 @@ modelo <- keras_model(input = 1)
 
 ## Nosso curso
 
-16/09 - Introdu��o + R base - Fernando 
+16/09 - Introdução + R base - Fernando 
 
 16/09 - Vetores + R base - Athos
 
@@ -70,7 +70,7 @@ knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/di
 
 ## Nosso curso
 
-O material do curso está dispon�vel nessa página (em desenvolvimento):
+O material do curso está disponível nessa página (em desenvolvimento):
 
 http://material.curso-r.com/
 
@@ -79,36 +79,50 @@ Também temos um blog:
 http://curso-r.com/blog/
 
 
-## Din�mica
+## Dinâmica
 
-- Almo�o �s 12h.
+- Almoço às 12h.
 - Aulas expositivas em blocos de 3h.
-- Exerc�cios ao decorrer e no final das aulas.
-- Leituras e exerc�cios complementares e opcionais fora da sala de aula.
+- Exercícios ao decorrer e no final das aulas.
+- Leituras e exercícios complementares e opcionais fora da sala de aula.
 
-<!-- ## Requisitos básicos  -->
+## Dinâmica
 
-<!-- - Lógica de programação. -->
+**Aula 1**
 
-<!-- - Veja essa apresentação de aprox. 10 min (slides: 13 ao 43): -->
+```{r, echo=FALSE}
+knitr::include_graphics("ciclo_aula1.png")
+```
 
-<!-- http://curso-r.github.io/slides/aula_00_01_apresentacao.html  -->
 
-<!-- - Leia esse post de blog (aprox. 5 min): -->
+## Dinâmica
 
-<!-- https://blog.rstudio.org/2016/09/15/tidyverse-1-0-0/ -->
+**Aula 2**
 
-<!-- - Se quiser ganhar tempo, crie uma conta no Github. -->
+```{r, echo=FALSE}
+  knitr::include_graphics("ciclo_aula2.png")
+```
+
+
+## Dinâmica
+
+**Pacotes**
+
+```{r, echo=FALSE}
+  knitr::include_graphics("http://www.storybench.org/wp-content/uploads/2017/05/tidyverse-768x310.png")
+```
+
+
 
 ## Não vamos falar de
 
-- Modelagem estat�stica (regressões, testes estat�sticos, clustering, componentes principais)
+- Estatística multivariada (unsupervised learning, clustering, componentes principais)
 
-- Gr�ficos din�micos e dashboards (Shiny, htmlwidgets)
+- Gráficos dinâmicos e dashboards (Shiny, htmlwidgets)
 
-- Programação eficiente com R (paraleliza��o, *profiling*, `Rcpp`)
+- Programação eficiente com R (paralelização, *profiling*, `Rcpp`)
 
-- N�o vamos nos aprofundar em "big data" (Spark, Hadoop, MongoDB, TensorFlow)
+- Não vamos nos aprofundar em "big data" (Spark, Hadoop, MongoDB, TensorFlow)
 
 ## Tidyverse
 
@@ -132,14 +146,6 @@ knitr::include_graphics("abc.jpg")
     - Cada observação é uma linha do bd.
     - Cada variável é uma coluna do bd.
     - Cada dado está numa célula do bd.
-
-
-## Princípios do tidyverse
-
-- Utilização do operador *pipe*: `%>%`.
-
-    > "No matter how complex and polished the individual operations are, it is often the quality of the glue that most directly determines the power of the system."  
-    > -- Hal Abelson
 
 ## Estrutura do tidyverse
 
