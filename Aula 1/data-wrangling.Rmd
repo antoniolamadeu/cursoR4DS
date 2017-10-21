@@ -17,6 +17,106 @@ library(lubridate)
 library(stringr)
 ```
 
+
+
+
+## Pipe `%>%`
+
+```{r}
+library(magrittr)
+```
+
+![](https://github.com/tidyverse/magrittr/raw/master/inst/logo.png)
+
+![](https://upload.wikimedia.org/wikipedia/en/b/b9/MagrittePipe.jpg)
+
+As duas linhas abaixo são equivalentes:
+
+```{r}
+f(x, y)
+x %>% f(y)
+
+# como se fosse a notação de função composta na matemática: f o g => f(g(x))
+```
+
+
+Exercício: calcular raiz quadrada da soma dos valores de 1 a 4.
+
+```{r}
+x <- c(1, 2, 3, 4)
+sqrt(sum(x))
+```
+
+Agora escreva esse cálculo utilizando o pipe:
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+Exercício mental: imagine 10 funções encaixadas sem o pipe.
+
+SQL:
+sum(convert(substring(concat(...))))
+
+
+
+
+
+
+
+
+
+
+### Receita de bolo
+
+Tente entender o que é preciso fazer. 
+
+```{r, eval=FALSE}
+
+esfrie(
+  asse(
+    coloque(
+      bata(
+        acrescente(
+          recipiente(rep("farinha", 2), "água", "fermento", "leite", "óleo")
+          , "farinha", até = "macio"
+        ), 
+        duração = "3min"
+      ), lugar = "forma", tipo = "grande", untada = TRUE
+    ), 
+    duração = "50min"
+  ), 
+  "geladeira", "20min")
+
+```
+
+Agora veja como fica escrevendo com o `%>%`:
+
+```{r, eval=FALSE}
+
+recipiente(rep("farinha", 2), "água", "fermento", "leite", "óleo") %>%
+  acrescente("farinha", até = "macio") %>%
+  bata(duraço = "3min") %>%
+  coloque(lugar = "forma", tipo = "grande", untada = TRUE) %>%
+  asse(duração = "50min") %>%
+  esfrie("geladeira", "20min")
+```
+
+Agora o código realmente parece uma receita de bolo.
+
+
+
+
 ## Importação 
 
 ### Excel
@@ -456,6 +556,15 @@ d_infos <- d_infos %>%
 
 2) Fazer um gráfico da quantidade de decisões por dia
 
+```{r}
+
+```
+
+
+
+
+
+
 
 
 
@@ -481,8 +590,53 @@ d_infos %>%
   scale_x_date(limits = dmy(c("01-10-2016", "01-01-2017")))
 ```
 
-3) Qual é o dia da semana com mais distribuições? Dica: Veja as funções do 
+3) Faça uma tabela com a contagem de distribuições por dia da semana (seg, ter, qua, ...). Faça uma coluna com a frequência relativa.
+Dica: use `mutate()` e a função `wday()` do lubridate.
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+d_infos %>%
+  mutate(dia_da_semana = wday(data_de_distribuicao, label = TRUE)) %>%
+  count(dia_da_semana) %>%
+  mutate(p = n/sum(n),
+         p_bonito = scales::percent(p))
+```
+
+4) Faça um gráfico de barras para descobrir qual é o dia da semana com mais distribuições. Dica: use `mutate()` e a função `wday()` do 
 lubridate.
+
+```{r}
+
+```
+
+
+
+
+
 
 
 
@@ -505,9 +659,18 @@ d_infos %>%
 ```
 
 
+
+
+
+
+
 ## Construíndo a variável resposta
 
-O R básico não tem uma sintaxe consistente para trabalhar com textos.
+**ANTES... PAUSA PARA TEORIA**
+
+Sobre o pacote `stringr`
+
+O R básico não tem uma sintaxe legal pra trabalhar com textos.
 O pacote `stringr` ajuda a realizar todas as tarefas básicas de manipulação de texto,
 exigindo que o usuário estude apenas uma sintaxe.
 O `stringr` também é construído sobre a [biblioteca ICU](http://site.icu-project.org/),
@@ -519,9 +682,13 @@ As regras básicas do pacote são:
 - As funções de manipulação de texto começam com `str_`. Caso esqueça o nome de uma função, basta digitar `stringr::str_` e apertar `TAB` para ver quais são as opções.
 - O primeiro argumento da função é sempre uma `string`.
 
-Antes de listar as funções, 
-precisamos estudar o básico de 
-expressões regulares.
+
+
+
+
+
+
+
 
 ### Expressões regulares
 
@@ -533,7 +700,7 @@ A tabela abaixo mostra a aplicação de seis `regex` a seis strings distintas.
 
 ```{r}
 library(stringr)
-testes <- c('ban', 'banana', 'abandonado', 'pranab anderson', 'BANANA', 'ele levou ban')
+palavra <- c('ban', 'banana', 'abandonado', 'pranab anderson', 'BANANA', 'ele levou ban') %>% setNames(palavras)
 
 expressoes <- list(
   'ban', # reconhece tudo que tenha "ban", mas não ignora case
@@ -542,77 +709,86 @@ expressoes <- list(
   'ban$', # reconhece apenas o que termina exatamente em "ban"
   '^ban', # reconhece apenas o que começa exatamente com "ban"
   'b ?an' # reconhece tudo que tenha "ban", com ou sem espaço entre o "b" e o "a"
-)
+) %>% setNames(expressoes)
+
+
+
+expressoes %>% map_dfr(~palavras %>% map(str_detect, .x), .id = "regex")
 ```
 
-```{r echo=FALSE}
-purrr::map(testes, ~str_detect(testes, .x)) %>% 
-  {do.call(rbind, .)} %>% 
-  as.data.frame() %>% 
-  setNames(testes) %>% 
-  dplyr::mutate(regex = expressoes) %>% 
-  dplyr::select(regex, dplyr::everything()) %>% 
-  knitr::kable()
-```
 
-### Insumo da variável resposta
-
-- Três resultados possíveis: provido, parcialmente provido, improvido
-- A votação pode ser unânime (V.U.) ou não 
 
 ```{r}
-#Começando do mais fácil
+# Cheat sheet sobre REGEX
+
+knitr::include_graphics("https://www.rstudio.com/wp-content/uploads/2016/09/RegExCheatsheet.pdf")
+```
+
+
+
+
+### Informações do pesquisador sobre a variável resposta
+
+
+1) A votação pode ser unânime (V.U.) ou não 
+2) Três resultados possíveis: provido, parcialmente provido, improvido
+
+
+#### Começando do mais fácil - V.U
+
+```{r}
 
 d_infos <- d_infos %>% 
   mutate(voto_unanime = str_detect(decisao, "V\\.U\\."))
-```
 
-```{r}
+
 # Essa é uma regex ruim!
-
 d_infos %>% 
-  filter(!voto_unanime) %>%
-  View
+  filter(!voto_unanime) %>% 
+  select(decisao, voto_unanime) %>% 
+  View 
 ```
+
 
 ```{r}
 d_infos <- d_infos %>% 
-  mutate(voto_unanime = str_detect(decisao, regex("V\\.? ?U\\.?", ignore_case = T)))
-```
+  mutate(voto_unanime = str_detect(decisao, regex("V\\.? ?U\\.?", ignore_case = TRUE)))
 
-```{r}
 # Ainda não funcionou! Olhe a linha 10.
 d_infos %>% 
   filter(!voto_unanime) %>%
+  select(decisao, voto_unanime) %>% 
   View
 ```
+
 
 ```{r}
 d_infos <- d_infos %>% 
-  mutate(voto_unanime = str_detect(decisao, regex("unanim|V\\.? ?U\\.?", ignore_case = T)))
-```
+  mutate(voto_unanime = str_detect(decisao, regex("unanim|V\\.? ?U\\.?", ignore_case = TRUE)))
 
-```{r}
 # Ainda não funcionou! Olhe a linha 17.
 d_infos %>% 
   filter(!voto_unanime) %>%
+  select(decisao, voto_unanime) %>% 
   View
 ```
+
 
 ```{r}
 d_infos <- d_infos %>% 
   mutate(decisao = rslp:::remove_accents(decisao), 
-    voto_unanime = str_detect(decisao, regex("unanim|V\\.? ?U\\.?", ignore_case = T)))
-```
+    voto_unanime = str_detect(decisao, regex("unanim|V\\.? ?U\\.?", ignore_case = TRUE)))
 
-```{r}
+# OK.
 d_infos %>% 
   filter(!voto_unanime) %>%
+  select(decisao, voto_unanime) %>% 
   View
 ```
 
 
-### Parte mais complicada
+
+#### Parte mais complicada - provimento
 
 ```{r}
 regex_parcialmente_provido <- "parcial provimento"
@@ -628,6 +804,10 @@ d_infos <- d_infos %>%
            stringr::str_detect(decisao, regex_nao_provido) ~ "Improvido",
            TRUE ~ "Outros"
          ))
+
+# Vocabulário
+# - str_to_lower
+# - remove_accents
 ```
 
 ```{r}
@@ -637,10 +817,18 @@ d_infos %>%
 
 ## Exercício
 
-Aprimore as regex acima para diminuir a proporção de casos classificados como "Outros". Uma proporção menor do que 20% é aceitável.
+1) Coloque uma coluna de proporção na tabela de contingência acima.
+
+
+
+
+2) Aprimore as regex do provido/nao_provido/parcialmente_provido para diminuir a proporção de casos classificados como "Outros". Uma proporção menor do que 20% é aceitável.
 
 Dica: Explore a coluna `decisao` nos casos em que a regex acima classifcou como "Outros".
 
+```{r}
+
+```
 
 
 
@@ -657,7 +845,15 @@ Dica: Explore a coluna `decisao` nos casos em que a regex acima classifcou como 
 
 
 
-### Solução 1
+
+
+
+
+
+
+
+
+### Solução para 1 e 2
 
 ```{r}
 regex_parcialmente_provido <- "parcial provimento|provimento em parte|provimento parcial"
@@ -673,17 +869,20 @@ d_infos <- d_infos %>%
            stringr::str_detect(decisao, regex_nao_provido) ~ "Improvido",
            TRUE ~ "Outros"
          ))
+
+d_infos %>% 
+  count(resultado) %>%
+  mutate(p = round(n/sum(n), 2))
 ```
 
 
 
-
+### Outra Solução (regex mais sofisticado)
 
 ```{r}
 regex_parcialmente_provido <- "parcial provimento|provimento em parte|provimento parcial"
 regex_provido <- "recurso provido|deram provimento (ao|a)|mantiveram o|recursos?( e remessas?( necessaria)? ?)? conhecidos e providos"
 regex_nao_provido <- "rejeitaram os embargos|julgaram prejudicado|negaram provimento|nao conheceram|nao providos?"
-regex_nao_conheceram <- "nao conheceram"
 
 d_infos <- d_infos %>% 
   mutate(decisao = stringr::str_to_lower(decisao),
@@ -692,29 +891,119 @@ d_infos <- d_infos %>%
            stringr::str_detect(decisao, regex_parcialmente_provido) ~ "Parcialmente Provido",
            stringr::str_detect(decisao, regex_provido) ~ "Provido",
            stringr::str_detect(decisao, regex_nao_provido) ~ "Improvido",
-           stringr::str_detect(decisao, regex_nao_conheceram) ~ "Não Conheceram",
            TRUE ~ "Outros"
          ),
          decisao_binaria = ifelse(resultado == "Improvido", "Improvido", "Provido"))
+
+
+d_infos %>% 
+  count(resultado) %>%
+  mutate(p = round(n/sum(n), 2))
 ```
 
 
 ```{r}
 d_infos %>% 
   filter(resultado == "Outros") %>% 
+  select(decisao) %>%
   View
 ```
 
+
+
+
+
+
+
+
+
+
 ## Análises descritivas das explicativas versus a resposta
 
+primeiro, só a resposta.
+
 ```{r}
+d_infos %>% 
+  count(decisao_binaria) %>%
+  mutate(p = round(n/sum(n), 2))
+```
+
+
+```{r}
+# position 'stack': dá pra ver contagem, mas não dá pra ver proporção
+d_infos %>% 
+  count(decisao_binaria, assunto_geral) %>% 
+  mutate(assunto_geral = str_wrap(assunto_geral, 15)) %>%
+  ggplot(aes(y = n, x = assunto_geral, fill = decisao_binaria)) +
+  geom_bar(stat = 'identity', position = 'stack')
+
+
+# position 'fill': dá pra ver proporção, mas não dá pra ver contagem
 d_infos %>% 
   count(decisao_binaria, assunto_geral) %>% 
   mutate(assunto_geral = str_wrap(assunto_geral, 15)) %>%
   ggplot(aes(y = n, x = assunto_geral, fill = decisao_binaria)) +
   geom_bar(stat = 'identity', position = 'fill')
+
+# versão tabela simples
+d_infos %>% 
+  count(decisao_binaria, assunto_geral) %>%
+  spread(decisao_binaria, n, fill = 0) 
+  # janitor::ns_to_percents()
+
+# um testezinho chi-quadrado despretensioso
+d_infos %>% 
+  count(decisao_binaria, assunto_geral) %>%
+  spread(decisao_binaria, n, fill = 0) %>%
+  filter(Improvido > 0) %>%
+  select_if(is.numeric) %>%
+  as.matrix %>%
+  chisq.test()
 ```
 
+**PAUSA PARA TEORIA**
+
+## gather e spread
+
+- gather: "Empilha" o banco de dados
+- spread: "Joga" uma variável nas colunas
+- são funções inversas um do outro
+
+### gather
+
+```{r}
+acoes <- tibble(
+  tempo = as.Date('2017-01-01') + 0:4,
+  ITUB4 = rnorm(5, 0, 1),
+  VALE5 = rnorm(5, 0, 2),
+  PETR3 = rnorm(5, 0, 4)
+)
+
+acoes_gather <- acoes %>% gather(acao, preco, -tempo)
+
+acoes
+acoes_gather
+
+# obs: particularmente útil com ggplot2
+ggplot(acoes_gather) +
+  geom_line(aes(x = tempo, y = preco, colour = acao))
+```
+
+### spread
+
+```{r}
+acoes_gather %>% spread(acao, preco)
+```
+
+tambem conhecido como "pivotar/despivotar", "derreter/condensar", "colunar/descolunar", etc.
+
+
+
+
+
+## CONTINUANDO as análises descritivas das explicativas versus a resposta
+
+- variável: `extraordinaria`
 ```{r}
 d_infos %>% 
     count(decisao_binaria, extraordinaria) %>% 
@@ -723,11 +1012,13 @@ d_infos %>%
     geom_bar(stat = 'identity', position = 'fill')
 ```
 
+
+- variável: `duracao` (variável contínua!)
+
 ```{r}
+# Gráfico de barras
 d_infos %>%
-  mutate(duracao = dmy(data_da_ultima_decisao) - data_de_distribuicao,
-         duracao = as.numeric(duracao),
-         duracao = cut(duracao, breaks = 10, include.lowest = T, dig.lab = 3)) %>% 
+  mutate(duracao = cut(duracao, breaks = 10, include.lowest = T, dig.lab = 3)) %>% 
   count(decisao_binaria, duracao) %>% 
   ggplot(aes(y = n, x = duracao, fill = decisao_binaria)) +
   geom_bar(stat = 'identity', position = 'fill') +
@@ -735,16 +1026,42 @@ d_infos %>%
 ```
 
 ```{r}
+# densidade
 d_infos %>%
   ggplot(aes(x = duracao, fill = decisao_binaria)) +
-  geom_density(alpha = 0.5) +
-  coord_cartesian(xlim=c(0, 1000)) 
-  #+ facet_wrap(~decisao_binaria)
+  geom_density(alpha = 0.5) 
+```
+
+
+```{r}
+# boxplot
+d_infos %>%
+  ggplot(aes(y = duracao, x = 1, fill = decisao_binaria)) +
+  geom_boxplot() 
+```
+
+
+```{r}
+# tabela
+d_infos %>%
+  group_by(decisao_binaria) %>%
+  summarise(n = n(),
+            min = min(duracao, na.rm = TRUE),
+            media = mean(duracao, na.rm = TRUE),
+            desv_pad = sd(duracao, na.rm = TRUE),
+            q1 = quantile(duracao, na.rm = TRUE, probs = 0.25),
+            mediana = median(duracao, na.rm = TRUE),
+            q3 = quantile(duracao, na.rm = TRUE, probs = 0.75),
+            max = max(duracao, na.rm = TRUE))
 ```
 
 
 
+
+
+
 ```{r}
+library(forcats)
 # visualizar os assuntos com maior quantidade de resultados 
 # positivos
 d_infos %>%
@@ -789,11 +1106,29 @@ d_infos %>%
 
 
 
+## Extras
+
+### mutate-group_by
+
+- tabelas de bivars com summarise e spread
 
 
 
 
 
+
+
+
+
+### transformações úteis no mutate/summarise
+
+- cut/cut2/cut_interval/cut_number/cut_width/Hmisc::cut2
+- estatísticas: media/mediana/desvio padrao/max/min/quantil
+- matemáticas: log/sqrt/resto/sin/cos
+- lógicas: ==/>/</!=
+- posicional: last/first/nth
+- deslocamento: lead/lag
+- janeladas: cumsum/cumprod/cummin/cummax/cummean/RcppRoll::*
 
 
 
@@ -802,8 +1137,6 @@ d_infos %>%
 
 
 # Anexos
-
-
 
 ```{r, eval = FALSE}
 dataset <- readr::read_rds("data/d_cposg.rds")
