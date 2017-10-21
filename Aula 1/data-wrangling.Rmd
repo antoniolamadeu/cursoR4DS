@@ -1083,6 +1083,15 @@ d_infos %>%
 ```
 
 
+### Salve o seu BD!
+
+```{r}
+saveRDS(d_infos, file = "data/d_infos_tratado.rds")
+```
+
+
+
+
 # Exercícios:
 
 1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
@@ -1112,12 +1121,6 @@ d_infos %>%
 
 ## Extras
 
-### mutate-group_by
-
-- tabelas de bivars com summarise e spread
-
-
-
 
 
 
@@ -1126,13 +1129,66 @@ d_infos %>%
 
 ### transformações úteis no mutate/summarise
 
-- cut/cut2/cut_interval/cut_number/cut_width/Hmisc::cut2
+https://www.rstudio.com/resources/cheatsheets/
+
+- contagens: n()/n_distinct()/length
 - estatísticas: media/mediana/desvio padrao/max/min/quantil
 - matemáticas: log/sqrt/resto/sin/cos
+- texto: str_length/regex
+- data: mes/ano/intervalo/período
 - lógicas: ==/>/</!=
 - posicional: last/first/nth
 - deslocamento: lead/lag
 - janeladas: cumsum/cumprod/cummin/cummax/cummean/RcppRoll::*
+- categorizações: cut/cut_*
+
+```{r}
+set.seed(2)
+predicoes <- tibble(
+  individuo = rep(c(1, 2, 3, 4, 5), 2),
+  modelo = rep(c("modelo_a", "modelo_b"), each = 5),
+  previsao = runif(10),
+  resposta = rep(if_else(runif(5) > 0.5, "A", "B"), 2)
+)
+```
+
+```{r}
+# transformações matemáticas
+predicoes %>%
+  mutate(preditor_linear = log(previsao/(1 - previsao)))
+
+# mutate no lugar de summarise
+predicoes %>%
+  group_by(modelo) %>%
+  mutate(media = mean(previsao))
+  # summarise(media = mean(previsao))
+
+# group_by + mutate (ou filtro) por posição
+predicoes %>%
+  mutate(rank_antes_do_group_by = rank(previsao)) %>%
+  group_by(modelo) %>%
+  mutate(rank_depois_do_group_by = rank(previsao)) 
+  filter(rank(previsao) < 2) # os top 2 mais prováveis de ser A
+  
+# transformações deslocamento: lag ou lead
+acoes_gather %>%
+  group_by(acao) %>%
+  mutate(lag1 = lag(preco),
+         lag2 = lag(preco, 2),
+         lead1 = lead(preco))
+```
+
+
+
+
+### mutate-group_by
+
+- tabelas de bivars com summarise e spread
+
+```{r}
+
+```
+
 
 
 
