@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Pacotes
 
-```{r}
+```{r, message=FALSE}
 library(tidyverse)
 library(lubridate)
 library(stringr)
@@ -31,27 +31,29 @@ str(dados)
 ```{r, message=FALSe, error=FALSE, warning=FALSE}
 # Colocando o tipo das variáveis na mão
 dados <- readxl::read_excel("../Aula 1/data/bdc.xls",
-na = c("", "NT", "NA"),
-col_types = c("text",
-"date",
-"guess",
-"date",
-"text",
-rep("numeric", 4),
-"text",
-rep("numeric", 2),
-"text",
-rep("numeric", 2),
-"text",
-"text"))
+                            na = c("", "NT", "NA"),
+                            col_types = c("text",
+                                          "date",
+                                          "guess",
+                                          "date",
+                                          "text",
+                                          rep("numeric", 4),
+                                          "text",
+                                          rep("numeric", 2),
+                                          "text",
+                                          rep("numeric", 2),
+                                          "text",
+                                          "text"))
 ```
 
 ### CSV
 
 ```{r}
 # BD: csv com (;) e (,) como separador decimal
-dados <- readr::read_csv2("../Aula 1/data/bdc.csv",
-na = c("", "NT", "NA"))
+dados <- readr::read_csv2("../Aula 1/data/bdc.csv", 
+                          na = c("", "NT", "NA"),
+                          locale = locale(encoding = "utf-8"))
+names(dados)
 ```
 
 ### TAB Delim
@@ -66,12 +68,14 @@ dados <- readr::read_delim("../Aula 1/data/bdc.txt", delim = "\t")
 ```{r, eval = FALSE}
 # Criar um banco de dados SQLite
 
-mydb <- dbConnect(RSQLite::SQLite(), "my-db.sqlite")
+mydb <- DBI::dbConnect(RSQLite::SQLite(), "my-db.sqlite")
 
-dbWriteTable(mydb, "mtcars", mtcars)
-dbGetQuery(mydb, 'SELECT * FROM mtcars LIMIT 5')
-dbGetQuery(mydb, 'select * from mtcars where drat > 4')
+DBI::dbWriteTable(mydb, "mtcars", mtcars, overwrite = TRUE)
+DBI::dbGetQuery(mydb, 'SELECT * FROM mtcars LIMIT 5')
+DBI::dbGetQuery(mydb, 'select * from mtcars where drat > 4')
 ```
+
+
 
 # Mais opções
 
@@ -86,20 +90,41 @@ con <- dbConnect(odbc::odbc(),
                  UID      = rstudioapi::askForPassword("Database user"),
                  PWD      = rstudioapi::askForPassword("Database password"),
                  Port     = 1433)
-## Data wrangling
+
+# MySQL
+# SQLServer
+# Oracle
+# MongoDB
+# Cassandra
+# etc
 ```
 
-## Data Wrangling
 
-```{r, echo=FALSE}
-knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/diagrams/data-science.png")
-```
+
+
+
 
 ### Exercício 
 
-Carregue o conteúdo do arquivo `data/infos_processos.rds` num objeto chamado `d_infos`.
+1) Carregue o conteúdo do arquivo `data/infos_processos.rds` num objeto chamado `d_infos`.
+2) Carregue o conteúdo do arquivo `data/movs_processos.rds` num objeto chamado `d_movs`.
 
-Dica: O pacote `readr` tem uma ampla gama de funções para importação de dados.
+Dica: O pacote `readr` tem uma ampla gama de funções para importação de dados. escreva `readr::` no console a pressione TAB.
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -109,60 +134,32 @@ Dica: O pacote `readr` tem uma ampla gama de funções para importação de dados.
 
 ```{r}
 d_infos <- readr::read_rds("data/infos_processos.rds")
+d_movs <- readr::read_rds("data/movs_processos.rds")
 ```
 
-```{r, eval = FALSE}
-dataset <- readr::read_rds("data/d_cposg.rds")
 
-informacoes <- dataset %>% 
-  select(id, data) %>% 
-  unnest(data) %>% 
-  spread(data, value) %>% 
-  janitor::clean_names() %>% 
-  abjutils::rm_accent_from_names()
+## Manipulação de dados (Data Wrangling)
 
-decisoes <- dataset %>% 
-  select(id, decisions) %>% 
-  unnest(decisions) %>% 
-  group_by(id) %>%
-  filter(date == max(date))
-
-movs <- dataset %>% 
-  select(id, movs) %>% 
-  unnest(movs) %>% 
-  mutate(movement = format(movement, "%d/%m/%Y"))
-  #group_by(id) %>% 
-  #Wsummarise(data_dist = min(movement))
-
-processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
-
-d_infos <- informacoes %>% 
-  inner_join(decisoes) %>% 
-  #inner_join(movs) %>% 
-  filter(area == "Criminal",
-         id %in% processos,
-         !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
-         situacao %in% c("Encerrado", "Julgado", "Transitado")
-         # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
-         ) %>% 
-  select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
-  rename(data_ultima_decisao = date,
-         decisao = decision) %>% 
-  mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y")
-         #data_dist = format(data_dist, "%d/%m/%Y")
-  )
-
-saveRDS(d_infos, 'data/infos_processos.rds')
-saveRDS(movs,  'data/movs_processos.rds')
+```{r, echo=FALSE}
+knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/diagrams/data-science.png")
 ```
 
-### Diagnóstico das variáveis
+
+### Sobre o Banco de dados
 
 ```{r}
+dim(d_infos)
+names(d_infos)
 glimpse(d_infos)
+View(d_infos)
+
+dim(d_movs)
+names(d_movs)
+glimpse(d_movs)
+View(d_movs)
 ```
 
-```{r}
+```{r, message = FALSE}
 library(Hmisc)
 describe(d_infos) 
 
@@ -170,7 +167,45 @@ describe(d_infos)
 # meio chato de instalar por enquanto!
 library(skimr)
 skim(d_infos)
+skim(d_movs)
 ```
+
+
+### Diagnóstico das variáveis
+
+```{r}
+status <- function(data) {
+ n <- data %>% map_dbl(length)
+ n_distintos <- data %>% map_dbl(n_distinct)
+ n_branco <- data %>% map_dbl(~ sum(str_detect(.x, "^ *$"), na.rm = TRUE))
+ n_na <- data %>% map_dbl(~ sum(.x %in% c(NA, ".", "null"), na.rm = TRUE))
+ n_zero <- data %>% map_dbl(~ sum(.x %in% 0, na.rm = TRUE))
+ classe <- data %>% map_chr(~ class(.x)[1])
+ tem_caracteres_estranhos <- data %>% map_lgl(~ any(str_detect(.x, "[^[:print:]]"), na.rm = TRUE))
+ maximo_de_caracteres <- data %>% map_dbl(~ max(str_length(.x), na.rm = TRUE))
+ 
+ resp <- data.frame(n,
+                    n_distintos,
+                    n_branco,
+                    n_na,
+                    n_zero,
+                    classe,
+                    tem_caracteres_estranhos,
+                    maximo_de_caracteres) %>%
+   rownames_to_column("variavel")
+ return(resp)
+}
+
+d_infos %>% status
+d_movs %>% status
+
+
+# vocabulário
+# - map_dbl/map_chr/map_lgl (pacote 'purrr')
+# - n_distinct/length
+# - str_detect/str_length/regex (pacote stringr)
+```
+
 
 ## Arrumando a casa
 
@@ -211,6 +246,23 @@ d_infos %>%
 
 ```
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Tirando espaços indevidos:
 
 ```{r}
@@ -220,6 +272,7 @@ d_infos <- d_infos %>%
     assunto_intermediario = str_trim(assunto_intermediario),
     assunto = str_trim(assunto)
   )
+
 ```
 
 ## Comarca
@@ -234,7 +287,9 @@ d_infos %>%
 # Vamos criar novas variáveis
 d_infos <- d_infos %>% 
   mutate(extraordinaria = str_detect(distribuicao, "Extraordinária"),
-         grupo = str_detect(distribuicao, "Grupo"))
+         grupo = case_when(str_detect(distribuicao, "Grupo") ~ "Grupo",
+                           str_detect(distribuicao, "Câmara") ~ "Câmara",
+                           TRUE ~ "Outro"))
 ```
 
 ```{r}
@@ -243,13 +298,33 @@ d_infos %>%
 
 d_infos %>% 
   count(extraordinaria)
+
+
+# Vocabulário
+# - separate (tidyr)
+# - mutate (dplyr)
+# - case_when (dplyr)
+# - str_trim (stringr)
 ```
 
 ## Exercício 
 
-Separe a coluna "origem" em quantos pedaços for necessário.
+Separe a coluna "origem" em quantas colunas forem necessários.
 
-Dica: Existe uma função no pacote `tidyr` que faz isso.
+Dica: não se preocupe em dar o nome correto às colunas por enquanto.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -277,15 +352,40 @@ d_infos %>%
 
 ## Joins
 
+
+```{r, echo=FALSE}
+knitr::include_graphics("sql_vs_dplyr.png")
+```
+
+
 ```{r}
 d_movs <- readRDS("../Aula 1/data/movs_processos.rds")
 ```
 
 ```{r}
+# ponto importante aqui: group_by + summarise
 datas_de_distribuicao <- d_movs %>% 
   mutate(movement = dmy(movement)) %>% 
   group_by(id) %>% 
-  summarise(data_dist = min(movement))
+  summarise(data_de_distribuicao = min(movement))
+
+
+
+
+# só uma parênteses aqui.... vamos falar sobre 'arrange' e 'first'
+datas_de_distribuicao2 <- d_movs %>% 
+  mutate(movement = dmy(movement)) %>% 
+  group_by(id) %>% 
+  arrange(movement) %>%
+  summarise(data_de_distribuicao = first(movement)) # <- alternativa
+
+teste <- datas_de_distribuicao %>%
+  inner_join(datas_de_distribuicao2, by = "id") %>%
+  mutate(igual = data_de_distribuicao.x == data_de_distribuicao.y) 
+
+teste %>% View
+
+teste %>% filter(!igual)
 ```
 
 ```{r}
@@ -295,6 +395,8 @@ d_infos <- d_infos %>%
 # equivalente a explicitamente adicionar o `by`.
 # d_infos <- d_infos %>% 
 #   inner_join(datas_de_distribuicao, by = "id")
+names(datas_de_distribuicao)
+names(d_infos)
 ```
 
 
@@ -304,9 +406,11 @@ d_infos <- d_infos %>%
 library(lubridate)
 
 d_infos <- d_infos %>% 
-  mutate(dia_dist = day(data_dist),
-         mes_dist = month(data_dist),
-         ano_dist = year(data_dist))
+  mutate(dia_distribuicao = day(data_de_distribuicao),
+         mes_distribuicao = month(data_de_distribuicao),
+         ano_distribuicao = year(data_de_distribuicao))
+
+glimpse(d_infos)
 ```
 
 ## Exercício
@@ -318,16 +422,30 @@ d_infos <- d_infos %>%
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```{r}
 d_infos <- d_infos %>%
-  mutate(duracao = dmy(data_ultima_decisao) - data_dist,
+  mutate(duracao = dmy(data_da_ultima_decisao) - data_de_distribuicao,
          duracao = as.numeric(duracao))
 
 
 # ou usar o seguinte:
 d_infos <- d_infos %>%
   mutate(
-    duracao = difftime(data_ultima_decisao, data_dist, units = "days"),
+    duracao = difftime(data_da_ultima_decisao, data_de_distribuicao, units = "days"),
     duracao = as.numeric(duracao)
     )
 # 
@@ -348,16 +466,22 @@ d_infos <- d_infos %>%
 
 
 
+
+
+
+
+
+
 ```{r}
 d_infos %>%
-  group_by(data_ultima_decisao) %>%
+  group_by(data_da_ultima_decisao) %>%
   summarise(qtd = n()) %>%
-  ggplot(aes(x = dmy(data_ultima_decisao), y = qtd)) +
-  geom_line() +
+  ggplot(aes(x = dmy(data_da_ultima_decisao), y = qtd)) +
+  geom_col() +
   scale_x_date(limits = dmy(c("01-10-2016", "01-01-2017")))
 ```
 
-3) Qual é o dia da semana com mais distribuições? Faça um gráfico. Dica: Veja as funções do 
+3) Qual é o dia da semana com mais distribuições? Dica: Veja as funções do 
 lubridate.
 
 
@@ -375,7 +499,7 @@ lubridate.
 
 ```{r}
 d_infos %>%
-  mutate(dia_da_semana = wday(data_dist, label = TRUE)) %>%
+  mutate(dia_da_semana = wday(data_de_distribuicao, label = TRUE)) %>%
   ggplot() + 
   geom_bar(aes(x = dia_da_semana))
 ```
@@ -601,7 +725,7 @@ d_infos %>%
 
 ```{r}
 d_infos %>%
-  mutate(duracao = dmy(data_ultima_decisao) - data_dist,
+  mutate(duracao = dmy(data_da_ultima_decisao) - data_de_distribuicao,
          duracao = as.numeric(duracao),
          duracao = cut(duracao, breaks = 10, include.lowest = T, dig.lab = 3)) %>% 
   count(decisao_binaria, duracao) %>% 
@@ -645,3 +769,77 @@ d_infos %>%
 3) A distribuição de providos é diferente entre os foros da comarca de São Paulo?
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Anexos
+
+
+
+```{r, eval = FALSE}
+dataset <- readr::read_rds("data/d_cposg.rds")
+
+informacoes <- dataset %>% 
+  select(id, data) %>% 
+  unnest(data) %>% 
+  spread(data, value) %>% 
+  janitor::clean_names() %>% 
+  abjutils::rm_accent_from_names()
+
+decisoes <- dataset %>% 
+  select(id, decisions) %>% 
+  unnest(decisions) %>% 
+  group_by(id) %>%
+  filter(date == max(date))
+
+movs <- dataset %>% 
+  select(id, movs) %>% 
+  unnest(movs) %>% 
+  mutate(movement = format(movement, "%d/%m/%Y"))
+  #group_by(id) %>% 
+  #Wsummarise(data_de_distribuicao = min(movement))
+
+processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
+
+d_infos <- informacoes %>% 
+  inner_join(decisoes) %>% 
+  #inner_join(movs) %>% 
+  filter(area == "Criminal",
+         id %in% processos,
+         !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
+         situacao %in% c("Encerrado", "Julgado", "Transitado")
+         # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
+         ) %>% 
+  select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
+  rename(data_da_ultima_decisao = date,
+         decisao = decision) %>% 
+  mutate(data_da_ultima_decisao = format(data_da_ultima_decisao, "%d/%m/%Y")
+         #data_de_distribuicao = format(data_de_distribuicao, "%d/%m/%Y")
+  )
+
+saveRDS(d_infos, 'data/infos_processos.rds')
+saveRDS(movs,  'data/movs_processos.rds')
+```

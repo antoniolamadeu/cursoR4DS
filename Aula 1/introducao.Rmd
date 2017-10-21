@@ -78,6 +78,13 @@ Também temos um blog:
 
 http://curso-r.com/blog/
 
+## Nosso curso
+
+Material sobre conceitos (data science, machine learning, etc)
+
+http://www-bcf.usc.edu/~gareth/ISL/ISLR%20Seventh%20Printing.pdf
+
+(ou jogue no google: Introduction to statistical learning)
 
 ## Dinâmica
 
