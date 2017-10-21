@@ -765,9 +765,15 @@ d_infos %>%
 # Exercícios:
 
 1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
-2) Dependendo do assunto do processo a duração é diferente?
-3) A distribuição de providos é diferente entre os foros da comarca de São Paulo?
-
+2) Dependendo do assunto do processo a duração é diferente? Compare apenas entre os assuntos intermediários que mais acontecem.
+3) Qual é o Foro com maior número de processos? 
+4) Existe diferença no resultado do processo dependendo da classe? Faça um gráfico p/ apresentar os resultados.
+5) Em geral os relatores se apresentam sempre na mesma Vara? Faça um gráfico p/ apresentar os resultados.
+6) Existe diferença na duração dos processos entre as Comarcas? Faça um gráfico p/ apresentar os resultados.
+7) Qual é o primeiro nome mais comum entre os relatores e revisores? Faça um gráfico p/ apresentar os resultados.
+8) Qual é o número médio de palavras do texto da decisão por assunto? Faça um gráfico p/ apresentar os resultados.
+9) Existem pares de revisores e relatores que analisaram mais de 10 processos juntos?
+10) Quantos assuntos distintos são julgados em cada vara? Faça um gráfico p/ apresentar os resultados.
 
 
 
