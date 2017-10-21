@@ -249,6 +249,7 @@ knitr::include_graphics("https://raw.githubusercontent.com/hadley/r4ds/master/di
 
 ```{r}
 dim(d_infos)
+dim(d_infos %>% distinct)
 names(d_infos)
 glimpse(d_infos)
 View(d_infos)
@@ -304,7 +305,10 @@ d_movs %>% status
 # - map_dbl/map_chr/map_lgl (pacote 'purrr')
 # - n_distinct/length
 # - str_detect/str_length/regex (pacote stringr)
+# - distinct
 ```
+
+
 
 
 ## Arrumando a casa
