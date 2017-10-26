@@ -1,0 +1,271 @@
+---
+title: "Aula 2"
+author: "Curso-R"
+date: "25 de outubro de 2017"
+output: html_document
+---
+
+## Recapitulação da Aula 1
+
+- pipe
+- RMarkdown
+- Importação dos dados
+- Diagnóstico inicial
+- Limpeza dos dados
+- Descritivas: tabelas de contingência e gráficos
+- Preparação da variável resposta
+- regex, gather/spread, dplyr, tidyr, stringr, lubridate.
+
+
+```{r, echo=FALSE}
+knitr::include_graphics("ciclo_aula1.png")
+```
+
+
+## Exercícios da Aula 1. Dúvidas?
+
+```{r}
+library(tidyverse)
+d_infos <- readr::read_rds("data/d_infos_tratado.rds")
+```
+
+1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
+```{r}
+d_infos %>%
+  group_by(relator) %>%
+  summarise(n = n(),
+            n_provido = sum(decisao_binaria == "Provido"),
+            p_provido = n_provido/n) %>%
+  filter(n_provido == max(n_provido) | p_provido == max(p_provido)) %>%
+  # filter(n > 5) %>%
+  arrange(desc(n_provido), desc(p_provido))
+```
+
+2) Dependendo do assunto do processo a duração é diferente? Compare apenas entre os assuntos intermediários que mais acontecem.
+
+```{r}
+library(forcats)
+d_infos %>%
+  mutate(duracao = as.numeric(duracao),
+         assunto_intermediario = assunto_intermediario %>% str_wrap(12) %>% fct_lump(5, other_level = "Outro") %>% fct_reorder(duracao)) %>%
+ggplot() +
+  geom_boxplot(aes(x = assunto_intermediario, y = duracao)) +
+  scale_y_log10() 
+```
+
+3) Qual é o Foro com maior número de processos? 
+
+```{r}
+
+```
+
+
+4) Existe diferença no resultado do processo dependendo da classe? Faça um gráfico p/ apresentar os resultados.
+5) Em geral os relatores se apresentam sempre na mesma Vara? Faça um gráfico p/ apresentar os resultados.
+6) Existe diferença na duração dos processos entre as Comarcas? Faça um gráfico p/ apresentar os resultados.
+7) Qual é o primeiro nome mais comum entre os relatores e revisores? Faça um gráfico p/ apresentar os resultados.
+8) Qual é o número médio de palavras do texto da decisão por assunto? Faça um gráfico p/ apresentar os resultados.
+9) Existem pares de revisores e relatores que analisaram mais de 10 processos juntos?
+10) Quantos assuntos distintos são julgados em cada vara? Faça um gráfico p/ apresentar os resultados.
+
+
+
+
+
+## Aula 2
+
+```{r, echo=FALSE}
+knitr::include_graphics("ciclo_aula2.png")
+```
+
+Pré-processamentos
+criação de variáveis
+bag of words
+Conceitos
+erros de ajuste vs. erros de predição
+Sobreajuste (Overfiting)
+Validação cruzada (cross-validation)
+regularização (LASSO)
+Modelos
+regressão logística
+árvore de decisão
+bagging
+random forest
+xgboost
+Diagnóstico de modelos de classificação
+matriz de confusão, tpr, fpr
+curva ROC
+KS
+
+
+
+## Regressão Logística
+
+### dados
+
+```{r}
+# pacotes
+library(glmnet)
+library(glmnetUtils)
+library(tidyverse)
+```
+
+```{r}
+# dados simulados
+set.seed(19880923)
+n <- 10000
+df <- rnorm(30 * n) %>%
+  matrix(nrow = n) %>%
+  as.data.frame() %>%
+  mutate(y = rbinom(n, 1, prob = 1/(1 + exp(-1 * (-1 + 0.5 * V1 + 0.5 * V2 + 0.5 * V3)))),
+         particao = ifelse(runif(n()) > 0.3, "treino", "teste"))
+```
+
+
+### glm com LASSO - Ajuste do modelo logístico penalizado no R
+
+```{r}
+modelo_com_lasso <- glmnetUtils::cv.glmnet(y ~ .,
+                                           data = df %>% filter(particao == "treino") %>% select(-particao),
+                                           family = "binomial",
+                                           alpha = 1)
+plot(modelo_com_lasso)
+```
+
+```{r}
+# lambda escolhido
+modelo_com_lasso$lambda.1se
+
+# coeficientes
+coef(modelo_com_lasso, s = "lambda.1se")
+```
+
+
+## O que é um modelo bom?
+
+```{r}
+# plugando o score na base
+df <- df %>%
+  mutate(predito = predict(modelo_com_lasso, newdata = ., type = "response") %>% as.vector)
+```
+
+classificar usando a média da base
+
+```{r}
+# tabela de confundimento
+df <- df %>%
+  mutate(classe_predita = if_else(predito > mean(y), 1, 0))
+
+tab_de_conf <- table(df$y, df$classe_predita)
+tab_de_conf
+```
+
+```{r}
+# acurácia
+acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
+acc
+```
+
+
+Mas e se fizessemos classe predita = 1 pra todo mundo?
+
+```{r}
+# tabela de confundimento
+df <- df %>%
+  mutate(um_pra_todo_mundo = 1)
+
+tab_de_conf_degenerada <- table(df$y, df$um_pra_todo_mundo)
+tab_de_conf_degenerada
+```
+
+```{r}
+# acurácia
+acc <- sum(diag(tab_de_conf_degenerada))/sum(tab_de_conf_degenerada)
+acc
+```
+
+
+## Alternativas para medir desempenho do modelo logístico
+
+- KS
+- Curva ROC / AUC
+- (um monte de outras, mas menos comum)
+
+### KS
+
+Definição: maior distância entre a FDA dos scores dos 1's e a FDA dos scores dos 0's
+
+```{r}
+ggplot(df) +
+  stat_ecdf(aes(x = predito, colour = factor(y)))
+```
+
+Estatística KS
+
+```{r}
+# modelo
+with(df, ks.test(predito[y == 1], predito[y == 0]))$statistic %>% round(2)
+
+# UM pra todo mundo
+with(df, ks.test(um_pra_todo_mundo[y == 1], um_pra_todo_mundo[y == 0]))$statistic %>% round(2)
+```
+
+
+## Área sobre a curva ROC
+
+```{r}
+knitr::include_graphics("confusion_matrix.png")
+```
+
+Atenção! Uma pequena confusão:
+
+- Sensibilidade é TRUE POSITIVE RATE
+- Especificidade é 1 - FALSE POSITIVE RATE
+
+```{r}
+tpr <- function(real, predito, corte) {
+  sum(predito >= corte & real == 1) / sum(real == 1)
+}
+
+fpr <- function(real, predito, corte) {
+  sum(predito >= corte & real == 0) / sum(real == 0)
+}
+
+
+with(df, tpr(y, predito, mean(y)))
+```
+
+
+Curva ROC
+
+um monte de "matriz de confundimento". No exemplo, 100 delas.
+
+```{r}
+cortes <- seq(0,1, l = 100)
+TPR_modelo <- sapply(cortes, function(x) tpr(real, predito, x))
+FPR_modelo <- sapply(cortes, function(x) fpr(real, predito, x))
+
+TPR_aleatorio <- sapply(cortes, function(x) tpr(real, rep(1, length(real)), x))
+FPR_aleatorio <- sapply(cortes, function(x) fpr(real, rep(1, length(real)), x))
+
+data.frame(
+  tipo = rep(c("modelo", "aleatorio"), each = length(cortes)),
+  TPR = c(TPR_modelo, TPR_aleatorio),
+  FPR = c(FPR_modelo, FPR_aleatorio)
+) %>%
+  ggplot(aes(x = FPR, y = TPR, color = tipo)) +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, colour = "red")
+```
+
+### AUC
+
+AUC é a área sob a curva ROC. Vai de 0.5 a 1.
+
+```{r}
+library(Metrics)
+
+df %>%
+  summarise(auc_modelo = Metrics::auc(y, predito),
+            auc_aleatorio = Metrics::auc(y, runif(n())))
+```
