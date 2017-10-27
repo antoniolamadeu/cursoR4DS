@@ -141,13 +141,11 @@ d_infos %>%
 
 
 ```{r}
+# processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
+# RAW
 d_cjsg <- read_rds("data/d_cjsg.rds") %>% 
-  mutate(n_processo = str_replace_all(n_processo, "[^0-9]", "")) %>% 
-  filter(n_processo %in% processos)
-
-processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
-dataset <- read_rds("../Aula 1/data/d_cposg.rds") %>% 
-  filter(id %in% processos)
+  mutate(n_processo = str_replace_all(n_processo, "[^0-9]", ""))
+dataset <- read_rds("../Aula 1/data/d_cposg.rds")
 
 partes <- dataset %>% 
   select(id, parts) %>% 
@@ -176,26 +174,45 @@ informacoes <- dataset %>%
   unnest(data) %>% 
   spread(data, value) %>% 
   janitor::clean_names() %>% 
-  abjutils::rm_accent_from_names()
+  abjutils::rm_accent_from_names() %>% 
+  filter(str_detect(distribuicao, "de Direito Criminal|Extraord")) %>% 
+  separate(origem, c("comarca", "foro", "vara"), 
+           sep = " / ", extra = "merge", fill = "right") %>% 
+  mutate(foro_origem = fct_lump(foro, 10)) %>% 
+  separate(assunto, c("assunto_geral", "assunto_intermediario", "assunto"), 
+    sep = "-", extra = 'merge', fill = 'right'
+  ) %>% 
+  mutate_at(vars(assunto, assunto_intermediario), funs(str_trim)) %>% 
+  select(id, assunto_intermediario, assunto, camara = distribuicao, 
+         foro_origem, relator)
+
+tempos <- dataset %>% 
+  semi_join(partes, "id") %>% 
+  select(id, movs) %>% 
+  unnest(movs) %>% 
+  filter(movement < Sys.Date(), movement > as.Date("2000-01-01")) %>% 
+  group_by(id) %>% 
+  summarise(n_movs = n(),
+            tempo = as.numeric(max(movement) - min(movement)))
+
   
 # Varias regex
 re_vu <- regex("unanim|V\\.? ?U\\.?", ignore_case = TRUE)
 re_negaram <- regex("negaram|improc|improv|mantiv|não prov", ignore_case = TRUE)
 re_parcial <- regex("parcial|em parte", ignore_case = TRUE)
 re_extin <- regex("extin|prejud", ignore_case = TRUE)
-re_conhe <- regex("conhec", ignore_case = TRUE)
-re_nulo <- regex("anul|nul[ia]", ignore_case = TRUE)
-re_dilig <- regex("dilig", ignore_case = TRUE)
+re_nulo <- regex("anul|nul[ia]|dilig|conhec", ignore_case = TRUE)
 re_deram <- regex("deram|provim|acolher", ignore_case = TRUE)
 
 # todos os tipos de outros
-outros <- c("Extinto", "Não conhecido", "Anulado", "Diligencia", "Outros")
+outros <- c("Extinto", "Anul., Dilig., Nao Conhec.", "Outros")
 
 decisoes <- dataset %>% 
   select(id, decisions) %>% 
   unnest(decisions) %>% 
   inner_join(partes, "id") %>% 
   arrange(desc(date)) %>% 
+  filter(!is.na(decision)) %>% 
   distinct(id, .keep_all = TRUE) %>% 
   mutate(
     unanime = if_else(str_detect(decision, re_vu), "Unanime", "Nao Unanime"),
@@ -204,9 +221,7 @@ decisoes <- dataset %>%
       str_detect(decision, re_negaram) & autor == "pessoa" ~ "Desfavoravel",
       str_detect(decision, re_parcial) ~ "Parcialmente",
       str_detect(decision, re_extin) ~ "Extinto",
-      str_detect(decision, re_conhe) ~ "Nao conhecido",
-      str_detect(decision, re_nulo) ~ "Anulado",
-      str_detect(decision, re_dilig) ~ "Diligencia",
+      str_detect(decision, re_nulo) ~ "Anul., Dilig., Nao Conhec.",
       str_detect(decision, re_deram) & autor == "MP" ~ "Desfavoravel",
       str_detect(decision, re_deram) & autor == "pessoa" ~ "Favoravel",
       TRUE ~ "Outros"
@@ -217,12 +232,42 @@ decisoes <- dataset %>%
       (decisao %in% outros & autor == "pessoa") ~ "Desfavoravel",
       TRUE ~ "Desfavoravel"
     )
-  )
+  ) %>% 
+  select(id, decisao_bin, decisao, autor, unanime)
 
-movs <- dataset %>% 
-  semi_join(partes, "id") %>% 
-  select(id, movs) %>% 
-  unnest(movs)
+
+d_final <- decisoes %>% 
+  inner_join(tempos, "id") %>% 
+  inner_join(informacoes, "id") %>% 
+  distinct(id, .keep_all = TRUE) %>% 
+  mutate(decisao_bin = factor(decisao_bin))
+```
+
+
+```{r}
+set.seed(10)
+treino <- d_final %>% 
+  sample_n(18000)
+teste <- d_final %>% 
+  anti_join(treino, "id")
+
+
+m <- glm(decisao_bin ~ autor + unanime + 
+           n_movs + tempo + assunto + camara +
+           foro_origem, 
+         data = teste, family = binomial())
+
+m %>% 
+  broom::augment(newdata = teste, type.predict = "response") %>% 
+  filter(!is.na(.fitted)) %>% 
+  mutate(res = if_else(.fitted > .5, "Favoravel", "Desfavoravel")) %>% 
+  summarise(prop = sum(res == decisao_bin) / n()) %>% 
+  with(prop)
+
+d_final %>% 
+  count(decisao_bin) %>% 
+  mutate(prop = n/sum(n))
+
 ```
 
 
