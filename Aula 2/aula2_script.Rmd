@@ -16,7 +16,6 @@ output: html_document
 - Preparação da variável resposta
 - regex, gather/spread, dplyr, tidyr, stringr, lubridate.
 
-
 ```{r, echo=FALSE}
 knitr::include_graphics("ciclo_aula1.png")
 ```
@@ -30,12 +29,13 @@ d_infos <- readr::read_rds("data/d_infos_tratado.rds")
 ```
 
 1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
+
 ```{r}
 d_infos %>%
   group_by(relator) %>%
   summarise(n = n(),
             n_provido = sum(decisao_binaria == "Provido"),
-            p_provido = n_provido/n) %>%
+            p_provido = n_provido / n) %>%
   filter(n_provido == max(n_provido) | p_provido == max(p_provido)) %>%
   # filter(n > 5) %>%
   arrange(desc(n_provido), desc(p_provido))
@@ -47,18 +47,23 @@ d_infos %>%
 library(forcats)
 d_infos %>%
   mutate(duracao = as.numeric(duracao),
-         assunto_intermediario = assunto_intermediario %>% str_wrap(12) %>% fct_lump(5, other_level = "Outro") %>% fct_reorder(duracao)) %>%
-ggplot() +
+         assunto_intermediario = assunto_intermediario %>% 
+           str_wrap(12) %>% 
+           fct_reorder(duracao) %>% 
+           fct_lump(5, other_level = "Outro")) %>%
+  # filter(duracao < 4000) %>%
+  ggplot() +
   geom_boxplot(aes(x = assunto_intermediario, y = duracao)) +
-  scale_y_log10() 
+  coord_flip()
 ```
 
 3) Qual é o Foro com maior número de processos? 
 
 ```{r}
-
+d_infos %>% 
+  separate(origem, c("comarca", "foro", "vara"), sep = " / ") %>% 
+  count(comarca, foro, sort = TRUE)
 ```
-
 
 4) Existe diferença no resultado do processo dependendo da classe? Faça um gráfico p/ apresentar os resultados.
 5) Em geral os relatores se apresentam sempre na mesma Vara? Faça um gráfico p/ apresentar os resultados.
@@ -68,9 +73,7 @@ ggplot() +
 9) Existem pares de revisores e relatores que analisaram mais de 10 processos juntos?
 10) Quantos assuntos distintos são julgados em cada vara? Faça um gráfico p/ apresentar os resultados.
 
-
-
-
+<!-- ----------------------------------------------------------------------- -->
 
 ## Aula 2
 
@@ -78,25 +81,181 @@ ggplot() +
 knitr::include_graphics("ciclo_aula2.png")
 ```
 
-Pré-processamentos
-criação de variáveis
-bag of words
-Conceitos
-erros de ajuste vs. erros de predição
-Sobreajuste (Overfiting)
-Validação cruzada (cross-validation)
-regularização (LASSO)
-Modelos
-regressão logística
-árvore de decisão
-bagging
-random forest
-xgboost
-Diagnóstico de modelos de classificação
-matriz de confusão, tpr, fpr
-curva ROC
-KS
+- Pré-processamentos
+- criação de variáveis
+- bag of words
 
+
+<!-- 1h00' OK -->
+- Setup
+- Exercicios anteriores
+- Revisao (principalmente ggplot2)
+
+<!-- 1h30' OK -->
+- Conceitos
+- erros de ajuste vs. erros de predição
+- Sobreajuste (Overfiting)
+
+<!-- 3h00' -->
+- regressão logística (nao esquecer de falar de formula)
+    - ajustar um modelo
+    - mude a formula
+- árvore de decisão
+    - ajustar um modelo
+    - plotar a arvore
+- matriz de confusão, tpr, fpr
+    - fazer a tabela de acertos na base de teste
+- curva ROC
+    - ajustar uma curva ROC
+    - comparar acerto dos modelos usando vários critérios (AUC, acerto)
+
+<!-- ----------------------------------------------------------------------- -->
+
+<!-- 5h00' FALTA bagging, rf xgboost -->
+- Validação cruzada (cross-validation)
+- regularização (LASSO)
+- bagging (conceituação teórica)
+- LASSO
+    - ajustar um lasso
+- random forest
+    - ajustar um rf
+- xgboost
+    - ajustar um xgboost
+
+<!-- 6h00' OK -->
+- communicate
+    - flexdashboards
+    - API
+        - captcha
+
+<!-- ----------------------------------------------------------------------- -->
+
+
+```{r}
+d_infos %>% 
+  count(resultado, decisao_binaria)
+```
+
+
+### Arrumação da base
+
+
+```{r}
+d_cjsg <- read_rds("data/d_cjsg.rds") %>% 
+  mutate(n_processo = str_replace_all(n_processo, "[^0-9]", "")) %>% 
+  filter(n_processo %in% processos)
+
+processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
+dataset <- read_rds("../Aula 1/data/d_cposg.rds") %>% 
+  filter(id %in% processos)
+
+partes <- dataset %>% 
+  select(id, parts) %>% 
+  unnest(parts) %>% 
+  filter(part %in% c("Apelante", "Apelado"), role != "Advogado") %>% 
+  # juntar casos com múltiplas partes
+  group_by(id, id1, part) %>% 
+  summarise(name = paste(name, collapse = "\n")) %>% 
+  ungroup() %>%
+  # classificacao de tipo de pessoa
+  mutate(tipo_part = case_when(
+    str_detect(name, "Minist|Justi") ~ "MP",
+    TRUE ~ "pessoa"
+  )) %>% 
+  # em alguns casos, existem pessoas no polo passivo e ativo. 
+  # vamos considerar só um (simplificacao)
+  distinct(id, part, tipo_part) %>% 
+  spread(part, tipo_part) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(apelante)) %>% 
+  select(id, autor = apelante)
+
+informacoes <- dataset %>% 
+  semi_join(partes, "id") %>% 
+  select(id, data) %>% 
+  unnest(data) %>% 
+  spread(data, value) %>% 
+  janitor::clean_names() %>% 
+  abjutils::rm_accent_from_names()
+  
+# Varias regex
+re_vu <- regex("unanim|V\\.? ?U\\.?", ignore_case = TRUE)
+re_negaram <- regex("negaram|improc|improv|mantiv|não prov", ignore_case = TRUE)
+re_parcial <- regex("parcial|em parte", ignore_case = TRUE)
+re_extin <- regex("extin|prejud", ignore_case = TRUE)
+re_conhe <- regex("conhec", ignore_case = TRUE)
+re_nulo <- regex("anul|nul[ia]", ignore_case = TRUE)
+re_dilig <- regex("dilig", ignore_case = TRUE)
+re_deram <- regex("deram|provim|acolher", ignore_case = TRUE)
+
+# todos os tipos de outros
+outros <- c("Extinto", "Não conhecido", "Anulado", "Diligencia", "Outros")
+
+decisoes <- dataset %>% 
+  select(id, decisions) %>% 
+  unnest(decisions) %>% 
+  inner_join(partes, "id") %>% 
+  arrange(desc(date)) %>% 
+  distinct(id, .keep_all = TRUE) %>% 
+  mutate(
+    unanime = if_else(str_detect(decision, re_vu), "Unanime", "Nao Unanime"),
+    decisao = case_when(
+      str_detect(decision, re_negaram) & autor == "MP" ~ "Favoravel",
+      str_detect(decision, re_negaram) & autor == "pessoa" ~ "Desfavoravel",
+      str_detect(decision, re_parcial) ~ "Parcialmente",
+      str_detect(decision, re_extin) ~ "Extinto",
+      str_detect(decision, re_conhe) ~ "Nao conhecido",
+      str_detect(decision, re_nulo) ~ "Anulado",
+      str_detect(decision, re_dilig) ~ "Diligencia",
+      str_detect(decision, re_deram) & autor == "MP" ~ "Desfavoravel",
+      str_detect(decision, re_deram) & autor == "pessoa" ~ "Favoravel",
+      TRUE ~ "Outros"
+    ),
+    decisao_bin = case_when(
+      decisao %in% c("Favoravel", "Parcialmente") ~ "Favoravel",
+      (decisao %in% outros & autor == "MP") ~ "Favoravel",
+      (decisao %in% outros & autor == "pessoa") ~ "Desfavoravel",
+      TRUE ~ "Desfavoravel"
+    )
+  )
+
+movs <- dataset %>% 
+  semi_join(partes, "id") %>% 
+  select(id, movs) %>% 
+  unnest(movs)
+```
+
+
+```{r}
+dataset <- readr::read_rds("data/d_cposg.rds")
+
+d_infos <- informacoes %>% 
+  inner_join(decisoes) %>% 
+  #inner_join(movs) %>% 
+  filter(area == "Criminal",
+         id %in% processos,
+         !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
+         situacao %in% c("Encerrado", "Julgado", "Transitado")
+         # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
+         ) %>% 
+  select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
+  rename(data_ultima_decisao = date,
+         decisao = decision) %>% 
+  mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y")
+         #data_dist = format(data_dist, "%d/%m/%Y")
+  )
+
+saveRDS(d_infos, 'data/infos_processos.rds')
+saveRDS(movs,  'data/movs_processos.rds')
+```
+
+
+
+
+
+
+
+<!-- ----------------------------------------------------------------------- -->
 
 
 ## Regressão Logística
@@ -146,7 +305,7 @@ coef(modelo_com_lasso, s = "lambda.1se")
 ```{r}
 # plugando o score na base
 df <- df %>%
-  mutate(predito = predict(modelo_com_lasso, newdata = ., type = "response") %>% as.vector)
+  mutate(predito = as.vector(predict(modelo_com_lasso, newdata = ., type = "response")))
 ```
 
 classificar usando a média da base
@@ -155,7 +314,6 @@ classificar usando a média da base
 # tabela de confundimento
 df <- df %>%
   mutate(classe_predita = if_else(predito > mean(y), 1, 0))
-
 tab_de_conf <- table(df$y, df$classe_predita)
 tab_de_conf
 ```
@@ -180,7 +338,7 @@ tab_de_conf_degenerada
 
 ```{r}
 # acurácia
-acc <- sum(diag(tab_de_conf_degenerada))/sum(tab_de_conf_degenerada)
+acc <- sum(diag(tab_de_conf_degenerada)) / sum(tab_de_conf_degenerada)
 acc
 ```
 
@@ -230,23 +388,20 @@ tpr <- function(real, predito, corte) {
 fpr <- function(real, predito, corte) {
   sum(predito >= corte & real == 0) / sum(real == 0)
 }
-
-
 with(df, tpr(y, predito, mean(y)))
 ```
-
 
 Curva ROC
 
 um monte de "matriz de confundimento". No exemplo, 100 delas.
 
 ```{r}
-cortes <- seq(0,1, l = 100)
-TPR_modelo <- sapply(cortes, function(x) tpr(real, predito, x))
-FPR_modelo <- sapply(cortes, function(x) fpr(real, predito, x))
+cortes <- seq(0, 1, l = 100)
+TPR_modelo <- sapply(cortes, function(x) tpr(df$y, df$predito, x))
+FPR_modelo <- sapply(cortes, function(x) fpr(df$y, df$predito, x))
 
-TPR_aleatorio <- sapply(cortes, function(x) tpr(real, rep(1, length(real)), x))
-FPR_aleatorio <- sapply(cortes, function(x) fpr(real, rep(1, length(real)), x))
+TPR_aleatorio <- sapply(cortes, function(x) tpr(df$y, rep(1, length(df$y)), x))
+FPR_aleatorio <- sapply(cortes, function(x) fpr(df$y, rep(1, length(df$y)), x))
 
 data.frame(
   tipo = rep(c("modelo", "aleatorio"), each = length(cortes)),
@@ -263,8 +418,6 @@ data.frame(
 AUC é a área sob a curva ROC. Vai de 0.5 a 1.
 
 ```{r}
-library(Metrics)
-
 df %>%
   summarise(auc_modelo = Metrics::auc(y, predito),
             auc_aleatorio = Metrics::auc(y, runif(n())))
