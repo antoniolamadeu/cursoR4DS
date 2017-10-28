@@ -183,8 +183,12 @@ informacoes <- dataset %>%
     sep = "-", extra = 'merge', fill = 'right'
   ) %>% 
   mutate_at(vars(assunto, assunto_intermediario), funs(str_trim)) %>% 
-  select(id, assunto_intermediario, assunto, camara = distribuicao, 
-         foro_origem, relator)
+  mutate(tipo_camara = if_else(str_detect(distribuicao, "Extra"), 
+                               "Extraordinaria", "Ordinaria")) %>% 
+  mutate(num_camara = str_extract(distribuicao, "^[0-9]+"),
+         num_camara = str_pad(num_camara, 2, "0", side = "left")) %>% 
+  select(id, assunto_intermediario, assunto, 
+         num_camara, tipo_camara, foro_origem, relator)
 
 tempos <- dataset %>% 
   semi_join(partes, "id") %>% 
@@ -252,9 +256,8 @@ teste <- d_final %>%
   anti_join(treino, "id")
 
 
-m <- glm(decisao_bin ~ autor + unanime + 
-           n_movs + tempo + assunto + camara +
-           foro_origem, 
+m <- glm(decisao_bin ~ autor + n_movs + tempo + assunto + 
+           num_camara * tipo_camara + foro_origem, 
          data = teste, family = binomial())
 
 m %>% 
@@ -264,7 +267,7 @@ m %>%
   summarise(prop = sum(res == decisao_bin) / n()) %>% 
   with(prop)
 
-d_final %>% 
+teste %>% 
   count(decisao_bin) %>% 
   mutate(prop = n/sum(n))
 
