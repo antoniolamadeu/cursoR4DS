@@ -24,7 +24,7 @@ knitr::include_graphics("ciclo_aula1.png")
 
 ```{r}
 library(tidyverse)
-d_infos <- readr::read_rds("data/d_infos_tratado.rds")
+d_infos <- readr::read_rds("../Aula 1/data/d_infos_tratado.rds")
 ```
 
 1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
@@ -91,6 +91,11 @@ knitr::include_graphics("ciclo_aula2.png")
 - revisao (principalmente ggplot2)
 - pré-processamentos
 - criação de variáveis
+
+<!-- 1h00' OK -->
+- Setup
+- Exercicios anteriores
+- Revisao (principalmente ggplot2)
 
 <!-- 1h30' -->
 - erros de ajuste vs. erros de predição
@@ -417,7 +422,9 @@ teste_arvore %>%
 
 ## Modelagem
 
-### O que é treinar o modelo?
+<!-- ----------------------------------------------------------------------- -->
+
+### O que é treinar um modelo?
 
 Encontrar uma função $f$ nesta equação:
 
@@ -433,13 +440,6 @@ em que:
 
 ### Como obter uma f?
 
-
-
-
-
-
-
-
 Definimos uma estrutura genérica (modelo) para $f$ e ajustamos para os dados obtidos.
 
 - Regressão linear
@@ -450,11 +450,7 @@ Definimos uma estrutura genérica (modelo) para $f$ e ajustamos para os dados obt
     - Boosting
     - Florestas Aleatórias
 
-
-
-
-
-### Regressão linear
+## Regressão linear
 
 Suposição de que $f(X)$ é da forma:
 
@@ -462,7 +458,13 @@ $$
 f(X) = \alpha + \beta X
 $$
 
-### Regressão polinomial
+## Como estimar $\alpha$ e $\beta$?
+
+$\alpha$ e $\beta$ são escolhidos de tal forma que:
+
+$$
+\sum_{i = 1}^{n} [y_i - (\alpha + \beta x_i)]^2
+$$
 
 Suposição de que $f(X)$ é da forma:
 
@@ -540,8 +542,9 @@ mean((modelo_polinomial$fitted.values - y)^2)
 
 Esse modelo é realmente melhor?
 
-
 ```{r}
+set.seed(11071995)
+
 x_novo <- runif(5)
 y_novo <- 2*x_novo + rnorm(5)
 
@@ -579,6 +582,59 @@ Conclusão: Modelo complicados (demais) são piores do que modelos simples
     - regularização
     - validação cruzada
 
+```{r}
+library(ggplot2)
+library(magrittr)
+library(dplyr)
+library(purrr)
+library(tidyr)
+set.seed(2)
+
+# dados --------------------------------------------------------------
+censo <- readRDS("data/censo.rds")
+censo %<>% mutate(base = ifelse(runif(n()) > 0.3, "treino", "teste"))
+
+# visualização -------------------------------------------------------
+censo %>%
+  filter(base == "treino") %>%
+  ggplot(aes(x = escolaridade, y = renda)) +
+  geom_point(size = 3) +
+  theme_gray(14)
+```
+
+
+# Exercício
+
+- Ajuste polinômios de graus de 1 a 12 e compare os seus erros de predição na base de teste. Qual é o melhor?
+
+```{r}
+ajusta_polinomio <- function(n) {
+  lm(renda ~ poly(escolaridade, n), data = censo %>% filter(base == "treino"))
+}
+
+reqm <- function(modelo, particao) {
+  dados <- censo %>% filter(base == particao)
+  observado <- dados$renda
+  esperado <- predict(modelo, newdata = dados)
+
+  sqrt(mean((observado - esperado)^2))
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Regressão linear parruda
 
 Suposição de que a média de $Y|X$ é $g(X)$
@@ -597,9 +653,10 @@ Quando $g$ é constante, o modelo parrudo equivale ao modelo linear simples.
 $$
 \frac{\text{Média}[Y|X]}{1-\text{Média}[Y|X]} = \exp(\beta X + \alpha)
 $$
+
 - $g(t) = \frac{\exp(t)}{1+\exp(t)}$
 
-### Regressão parruda: glm
+### Voltando para a base de semana passada...
 
 ```{r}
 m <- glm(decisao_bin ~ autor + n_movs + idade + 
@@ -684,7 +741,7 @@ with(teste, tnr(decisao_bin, predito, 0.5))
 
 ### Curva ROC
 
-Um monte de "matrizes de confundimento". No exemplo, 100 delas.
+um monte de matrizes de confundimento. No exemplo, 100 delas.
 
 ```{r}
 df <- teste
@@ -708,6 +765,7 @@ data.frame(
 tibble(TPR = TPR_modelo, FPR = FPR_modelo) %>%
   ggplot(aes(x = FPR, y = TPR)) +
   geom_line() +
+  geom_point(size = 1) + 
   geom_abline(slope = 1, intercept = 0, colour = "red") +
   theme_bw()
 ```
@@ -733,6 +791,32 @@ m <- glm(decisao_bin ~ autor + n_movs + idade + assunto +
          data = teste, family = binomial())
 ```
 
+## Exercício
+
+No gráfico abaixo, encontre o corte associado ao ponto pintado de vermelho claro.
+
+```{r}
+knitr::include_graphics("exercicio_2.png")
+```
+
+
+# Interações: coeficientes que variam quando cruzamos variáveis
+
+```{r}
+m <- glm(decisao_bin ~ autor + n_movs + idade + assunto + 
+           num_camara:tipo_camara + foro_origem, 
+         data = teste, family = binomial())
+```
+
+Originalmente:
+
+$$\text{Média}[Y|X, \text{Câmara 1 Criminal Comum}] = \text{Média}[Y|X, \text{Câmara 1 Extraordinaria}]$$
+
+Agora:
+
+$$\text{Média}[Y|X, \text{Câmara 1 Criminal Comum}] \neq \text{Média}[Y|X, \text{Câmara 1 Extraordinaria}]$$
+
+
 ```{r}
 teste <- teste %>%
   mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>%
@@ -746,9 +830,13 @@ tab_de_conf
 ```
 
 ```{r}
-acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
+acc <- sum(diag(tab_de_conf)) / sum(tab_de_conf)
 acc
 ```
+
+Acurácia ficou igual...
+
+Vamos tentar colocar mais assuntos
 
 ```{r}
 teste_com_mais_variaveis <- teste %>% 
@@ -764,6 +852,15 @@ teste_com_mais_variaveis <- teste %>%
                           "Tráfico", assunto),
          assunto = fct_lump(assunto, n = 10)) 
 ```
+
+## Exercíco 3
+
+Ajuste um modelo com esse novo assunto e compare os resultados com o modelo anterior. Está melhor do que antes?
+
+
+
+
+
 
 ```{r}
 m <- glm(decisao_bin ~ autor + assunto + assunto:num_camara + 
@@ -805,7 +902,11 @@ p_auc <- classifierplots::roc_plot(
 p_auc
 ```
 
+# Segunda tentativa de modelo de classificação: árvores
 
+```{r}
+knitr::include_graphics("tree.png")
+```
 
 ```{r}
 arvore <- rpart::rpart(decisao_bin ~ autor + assunto + num_camara + 
@@ -842,7 +943,6 @@ p_auc <- classifierplots::roc_plot(true, pred) +
   theme_minimal(16)
 p_auc
 ```
-
 
 <!-- ----------------------------------------------------------------------- -->
 
@@ -900,10 +1000,4 @@ teste %>%
 6. Qual a taxa de acerto do modelo trivial?
 
 7. Conte-nos sobre os resultados obtidos.
-
-
-
-
-
-
 
