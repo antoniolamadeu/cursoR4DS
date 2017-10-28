@@ -24,7 +24,7 @@ knitr::include_graphics("ciclo_aula1.png")
 
 ```{r}
 library(tidyverse)
-d_infos <- readr::read_rds("../Aula 1/data/d_infos_tratado.rds")
+d_infos <- readr::read_rds("data/d_infos_tratado.rds")
 ```
 
 1) Identifique os relatores com mais decisoes "Provido" em quantidade e percentualmente.
@@ -46,8 +46,9 @@ d_infos %>%
 library(forcats)
 library(stringr)
 d_infos %>%
-  mutate(duracao = as.numeric(duracao),
-         assunto_intermediario = assunto_intermediario %>% 
+  mutate(duracao = as.numeric(duracao)) %>% 
+  filter(duracao > 0) %>% 
+  mutate(assunto_intermediario = assunto_intermediario %>% 
            str_wrap(12) %>% 
            fct_reorder(duracao) %>% 
            fct_lump(5, other_level = "Outro")) %>%
@@ -61,7 +62,7 @@ d_infos %>%
 
 ```{r}
 d_infos %>% 
-  separate(origem, c("comarca", "foro", "vara"), sep = " / ") %>% 
+  separate(origem, c("comarca", "foro", "vara"), sep = " / ") %>%
   count(comarca, foro, sort = TRUE)
 ```
 
@@ -950,7 +951,6 @@ p_auc
 
 ```{r}
 d_final <- readRDS("data/d_final.rds")
-
 set.seed(19910401)
 treino_ids <- sample(seq_len(nrow(d_final)), 18000)
 treino <- d_final[treino_ids, ]
@@ -962,12 +962,12 @@ teste <- d_final[-treino_ids, ]
 
 ```{r}
 X <- model.matrix(decisao_bin ~ ., data = treino)
-m <- glmnet::cv.glmnet(X, treino$decisao_bin, family = "binomial")
+lasso <- glmnet::cv.glmnet(X, treino$decisao_bin, family = "binomial")
 
-X_new <- model.matrix(decisao_bin ~ ., data = select(teste, -id))
+X_new <- model.matrix(decisao_bin ~ ., data = teste)
 
 teste %>% 
-  mutate(res = predict(m, newx = X_new, 
+  mutate(res = predict(lasso, newx = X_new, 
                        s = "lambda.min", 
                        type = "response")[,1]) %>% 
   mutate(res = if_else(res > .5, "Favoravel", "Desfavoravel")) %>% 
@@ -975,12 +975,13 @@ teste %>%
   pull(prop)
 ```
 
+
 ## Modelo de florestas aleatórias
 
 ```{r}
-m <- randomForest::randomForest(decisao_bin ~ ., data = treino)
+rf <- randomForest::randomForest(decisao_bin ~ ., data = treino)
 teste %>% 
-  mutate(res = predict(m, newdata = teste, type = "class")) %>% 
+  mutate(res = predict(rf, newdata = teste, type = "class")) %>% 
   summarise(prop = sum(res == decisao_bin) / n()) %>% 
   pull(prop)
 ```
@@ -1001,3 +1002,4 @@ teste %>%
 
 7. Conte-nos sobre os resultados obtidos.
 
+8. Vamos conhecer o pacote `caret`! http://topepo.github.io/caret/index.html
