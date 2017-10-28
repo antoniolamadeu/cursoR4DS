@@ -93,15 +93,6 @@ knitr::include_graphics("ciclo_aula2.png")
 - pré-processamentos
 - criação de variáveis
 
-<!-- 1h00' OK -->
-- Setup
-- Exercicios anteriores
-- Revisao (principalmente ggplot2)
-
-<!-- 1h30' -->
-- erros de ajuste vs. erros de predição
-- Sobreajuste (Overfiting)
-
 <!-- 3h00' -->
 - regressão logística (nao esquecer de falar de formula)
     - ajustar um modelo
@@ -109,23 +100,25 @@ knitr::include_graphics("ciclo_aula2.png")
 - árvore de decisão
     - ajustar um modelo
     - plotar a arvore
+    
 - matriz de confusão, tpr, fpr
     - fazer a tabela de acertos na base de teste
+    - erros de ajuste vs. erros de predição
+    - Sobreajuste (Overfiting)
 - curva ROC
     - ajustar uma curva ROC
     - comparar acerto dos modelos usando vários critérios (AUC, acerto)
 
 <!-- 5h00' -->
-- Validação cruzada (cross-validation)
 - regularização (LASSO)
-- bagging (conceituação teórica)
+- Validação cruzada (cross-validation)
 - LASSO
     - ajustar um lasso
 - random forest
     - ajustar um rf
 - Desafio!
 
-<!-- 6h00' OK -->
+<!-- 6h00' -->
 - communicate
     - flexdashboards
     - API
@@ -958,7 +951,16 @@ teste <- d_final[-treino_ids, ]
 ```
 
 
+
+
 ## Modelo LASSO
+
+$$
+L = \sum_{i=1}^n (y - X\beta)^2 + \lambda ||\beta||_p
+$$
+
+- $p=1$ Regressão Lasso
+- $p=2$ Regressão Ridge
 
 ```{r}
 X <- model.matrix(decisao_bin ~ ., data = treino)
@@ -975,8 +977,10 @@ teste %>%
   pull(prop)
 ```
 
-
 ## Modelo de florestas aleatórias
+
+- Conceito de votação
+- 
 
 ```{r}
 rf <- randomForest::randomForest(decisao_bin ~ ., data = treino)
