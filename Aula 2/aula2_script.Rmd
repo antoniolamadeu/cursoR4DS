@@ -45,6 +45,8 @@ d_infos %>%
 
 ```{r}
 library(forcats)
+library(stringr)
+
 d_infos %>%
   mutate(duracao = as.numeric(duracao),
          assunto_intermediario = assunto_intermediario %>% 
@@ -83,8 +85,6 @@ knitr::include_graphics("ciclo_aula2.png")
 
 - Pré-processamentos
 - criação de variáveis
-- bag of words
-
 
 <!-- 1h00' OK -->
 - Setup
@@ -141,10 +141,14 @@ d_infos %>%
 
 
 ```{r}
+
+library(stringr)
+
 # processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
 # RAW
-d_cjsg <- read_rds("data/d_cjsg.rds") %>% 
-  mutate(n_processo = str_replace_all(n_processo, "[^0-9]", ""))
+# d_cjsg <- read_rds("data/d_cjsg.rds") %>% 
+#  mutate(n_processo = str_replace_all(n_processo, "[^0-9]", ""))
+
 dataset <- read_rds("../Aula 1/data/d_cposg.rds")
 
 partes <- dataset %>% 
@@ -268,80 +272,249 @@ d_final %>%
   count(decisao_bin) %>% 
   mutate(prop = n/sum(n))
 
+saveRDS(d_final, "data/d_final.rds")
+
 ```
 
 
 ```{r}
-dataset <- readr::read_rds("data/d_cposg.rds")
+# dataset <- readr::read_rds("data/d_cposg.rds")
+# 
+# d_infos <- informacoes %>% 
+#   inner_join(decisoes) %>% 
+#   #inner_join(movs) %>% 
+#   filter(area == "Criminal",
+#          id %in% processos,
+#          !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
+#          situacao %in% c("Encerrado", "Julgado", "Transitado")
+#          # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
+#          ) %>% 
+#   select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
+#   rename(data_ultima_decisao = date,
+#          decisao = decision) %>% 
+#   mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y")
+#          #data_dist = format(data_dist, "%d/%m/%Y")
+#   )
+# 
+# saveRDS(d_infos, 'data/infos_processos.rds')
+# saveRDS(movs,  'data/movs_processos.rds')
+```
 
-d_infos <- informacoes %>% 
-  inner_join(decisoes) %>% 
-  #inner_join(movs) %>% 
-  filter(area == "Criminal",
-         id %in% processos,
-         !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
-         situacao %in% c("Encerrado", "Julgado", "Transitado")
-         # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
-         ) %>% 
-  select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
-  rename(data_ultima_decisao = date,
-         decisao = decision) %>% 
-  mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y")
-         #data_dist = format(data_dist, "%d/%m/%Y")
-  )
+# Modelagem
 
-saveRDS(d_infos, 'data/infos_processos.rds')
-saveRDS(movs,  'data/movs_processos.rds')
+
+
+
+
+
+
+## O que é treinar o modelo?
+
+Encontrar uma função $f$ nesta equação:
+
+$$
+y = f(X) + \epsilon
+$$
+
+em que:
+
+- $y$ é o que queremos explicar: variável resposta,
+- $X$ são as informações que explicam: matriz de variáveis explicativas e
+- $\epsilon$ é um ruído aleatório.
+
+## Como obter uma f?
+
+
+
+
+
+
+
+
+Definimos uma estrutura genérica (modelo) para $f$ e ajustamos para os dados obtidos.
+
+- Regressão linear
+- Regressão logística
+- Árvore de decisão
+- Misturando vários modelos (segunda parte da aula)
+    - Bagging
+    - Boosting
+    - Florestas Aleatórias
+
+
+
+
+
+## Regressão linear
+
+Suposição de que $f(X)$ é da forma:
+
+$$
+f(X) = \alpha + \beta X
+$$
+
+## Regressão polinomial
+
+Suposição de que $f(X)$ é da forma:
+
+$$
+f(X) = \alpha + \beta_1 X + \beta_2 X^2 + ... + \beta_k X^k
+$$
+
+## Overfitting
+
+- Propósito da modelagem:
+  - Construir um modelo que erre pouco
+- Em linhas gerais, modelos ruins são modelos que erram
+- Erro de generalização
+
+$$\text{Overfitting = baixo erro na amostra}\nRightarrow\text{baixo erro no mundo}$$
+
+
+
+
+
+# Exemplo
+
+
+```{r}
+
+library(ggplot2)
+library(magrittr)
+set.seed(5)
+
+x <- runif(10)
+y <- 2*x + rnorm(10)
 ```
 
 
+$$Y = 2X + \epsilon$$
+```{r}
+
+data.frame(x = x, y = y) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +
+  theme_bw()
+
+```
+
+```{r}
+# Como ajustar modelos lineares
+
+modelo_linear <- lm(y ~ x)
+```
+
+```{r}
+# Como extrair os valores preditos
+
+modelo_linear$fitted.values
+```
+
+```{r}
+# Erro observado
+
+mean((modelo_linear$fitted.values - y)^2)
+```
+
+Existe um modelo que erra menos na amostra?
+
+```{r}
+
+data.frame(x = x, y = y) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 9), color = "blue", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +
+  theme_bw() +
+  geom_point(size = 4)
+
+```
+
+```{r}
+# Erro do modelo
+
+modelo_polinomial <- lm(y ~ poly(x, 9))
+mean((modelo_polinomial$fitted.values - y)^2)
+```
+
+Esse modelo é realmente melhor?
 
 
+```{r}
+x_novo <- runif(5)
+y_novo <- 2*x_novo + rnorm(5)
 
+dados_novos <- tibble(x_novo, y_novo)
 
+data.frame(x = x, y = y) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 9), color = "blue", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +
+  theme_bw() +
+  geom_point(size = 4) +
+  geom_point(aes(x = x_novo, y = y_novo), color = "orange", size = 4, data = dados_novos)
+```
+
+```{r}
+cat("Erro do modelo linear: \n")
+mean((predict(modelo_linear, data.frame(x = x_novo)) - y_novo)^2)
+
+cat("Erro do modelo polinomial: \n")
+mean((predict(modelo_polinomial, data.frame(x = x_novo)) - y_novo)^2)
+```
+
+Conclusão: Modelo complicados (demais) são piores do que modelos simples
 
 <!-- ----------------------------------------------------------------------- -->
 
+## Como não deixar o modelo complicado (demais)?
+
+- Nessa bloco da aula:
+    - Separe a base em dois pedaços e ajuste o modelo em um só
+- No próximo bloco da aula:
+    - regularização
+    - validação cruzada
+
+## Regressão linear parruda
+
+Suposição de que a média de $Y|X$ é $g(X)$
+
+$$
+\text{Média}[Y|X] = g(\beta X + \alpha) + \epsilon
+$$
+
+Quando $g$ é constante, o modelo parrudo equivale ao modelo linear simples.
 
 ## Regressão Logística
+
+- Modelo parrudo e muito utilizado
+- $Y$ tem que estar em $\{0,1\}$
+
+$$
+\frac{\text{Média}[Y|X]}{1-\text{Média}[Y|X]} = \exp(\beta X + \alpha)
+$$
+- $g(t) = \frac{\exp(t)}{1+\exp(t)}$
 
 ### dados
 
 ```{r}
-# pacotes
-library(glmnet)
-library(glmnetUtils)
-library(tidyverse)
+# Separando a nossa base em treino e teste
+set.seed(11071995)
+n <- 2000
+teste <- d_final %>% 
+  sample_n(n)
+
+treino <- d_final %>% 
+  anti_join(teste, by = 'id')
 ```
 
-```{r}
-# dados simulados
-set.seed(19880923)
-n <- 10000
-df <- rnorm(30 * n) %>%
-  matrix(nrow = n) %>%
-  as.data.frame() %>%
-  mutate(y = rbinom(n, 1, prob = 1/(1 + exp(-1 * (-1 + 0.5 * V1 + 0.5 * V2 + 0.5 * V3)))),
-         particao = ifelse(runif(n()) > 0.3, "treino", "teste"))
-```
-
-
-### glm com LASSO - Ajuste do modelo logístico penalizado no R
+## regressão parruda: glm
 
 ```{r}
-modelo_com_lasso <- glmnetUtils::cv.glmnet(y ~ .,
-                                           data = df %>% filter(particao == "treino") %>% select(-particao),
-                                           family = "binomial",
-                                           alpha = 1)
-plot(modelo_com_lasso)
-```
-
-```{r}
-# lambda escolhido
-modelo_com_lasso$lambda.1se
-
-# coeficientes
-coef(modelo_com_lasso, s = "lambda.1se")
+m <- glm(decisao_bin ~ autor + unanime + 
+           n_movs + tempo + assunto + camara +
+           foro_origem, 
+         data = teste, family = binomial())
 ```
 
 
@@ -349,17 +522,17 @@ coef(modelo_com_lasso, s = "lambda.1se")
 
 ```{r}
 # plugando o score na base
-df <- df %>%
-  mutate(predito = as.vector(predict(modelo_com_lasso, newdata = ., type = "response")))
+teste <- teste %>%
+  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>% filter(!is.na(predito))
 ```
 
 classificar usando a média da base
 
 ```{r}
 # tabela de confundimento
-df <- df %>%
-  mutate(classe_predita = if_else(predito > mean(y), 1, 0))
-tab_de_conf <- table(df$y, df$classe_predita)
+teste <- teste %>%
+  mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+tab_de_conf <- table(teste$decisao_bin, teste$classe_predita)
 tab_de_conf
 ```
 
@@ -369,15 +542,14 @@ acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
 acc
 ```
 
-
 Mas e se fizessemos classe predita = 1 pra todo mundo?
 
 ```{r}
 # tabela de confundimento
-df <- df %>%
-  mutate(um_pra_todo_mundo = 1)
+teste <- teste %>%
+  mutate(um_pra_todo_mundo = "Desfavoravel")
 
-tab_de_conf_degenerada <- table(df$y, df$um_pra_todo_mundo)
+tab_de_conf_degenerada <- table(teste$decisao_bin, teste$um_pra_todo_mundo)
 tab_de_conf_degenerada
 ```
 
@@ -394,25 +566,6 @@ acc
 - Curva ROC / AUC
 - (um monte de outras, mas menos comum)
 
-### KS
-
-Definição: maior distância entre a FDA dos scores dos 1's e a FDA dos scores dos 0's
-
-```{r}
-ggplot(df) +
-  stat_ecdf(aes(x = predito, colour = factor(y)))
-```
-
-Estatística KS
-
-```{r}
-# modelo
-with(df, ks.test(predito[y == 1], predito[y == 0]))$statistic %>% round(2)
-
-# UM pra todo mundo
-with(df, ks.test(um_pra_todo_mundo[y == 1], um_pra_todo_mundo[y == 0]))$statistic %>% round(2)
-```
-
 
 ## Área sobre a curva ROC
 
@@ -423,17 +576,19 @@ knitr::include_graphics("confusion_matrix.png")
 Atenção! Uma pequena confusão:
 
 - Sensibilidade é TRUE POSITIVE RATE
-- Especificidade é 1 - FALSE POSITIVE RATE
+    - Probabilidade de estar certo quando disse que é "Favorável"
+- Especificidade é 1 - TRUE NEGATIVE RATE
+    - Probabilidade de estar certo quando disse que é "Desfavorável"
 
 ```{r}
-tpr <- function(real, predito, corte) {
-  sum(predito >= corte & real == 1) / sum(real == 1)
+tpr <- function(real, predito, corte = 0.5) {
+  sum(predito >= corte & real == "Favoravel") / sum(real == "Favoravel")
 }
 
-fpr <- function(real, predito, corte) {
-  sum(predito >= corte & real == 0) / sum(real == 0)
+tnr <- function(real, predito, corte) {
+  sum(predito <= corte & real == "Desfavoravel") / sum(real == "Desfavoravel")
 }
-with(df, tpr(y, predito, mean(y)))
+with(teste, tpr(decisao_bin, predito, 0.5))
 ```
 
 Curva ROC
@@ -441,29 +596,36 @@ Curva ROC
 um monte de "matriz de confundimento". No exemplo, 100 delas.
 
 ```{r}
-cortes <- seq(0, 1, l = 100)
-TPR_modelo <- sapply(cortes, function(x) tpr(df$y, df$predito, x))
-FPR_modelo <- sapply(cortes, function(x) fpr(df$y, df$predito, x))
+df <- teste
 
-TPR_aleatorio <- sapply(cortes, function(x) tpr(df$y, rep(1, length(df$y)), x))
-FPR_aleatorio <- sapply(cortes, function(x) fpr(df$y, rep(1, length(df$y)), x))
+cortes <- seq(0, 1, l = 100)
+TPR_modelo <- sapply(cortes, function(x) tpr(df$decisao_bin, df$predito, x))
+FPR_modelo <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, df$predito, x))
+
+TPR_aleatorio <- sapply(cortes, function(x) tpr(df$decisao_bin, rep(1, length(df$predito)), x))
+FPR_aleatorio <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, rep(1, length(df$predito)), x))
 
 data.frame(
   tipo = rep(c("modelo", "aleatorio"), each = length(cortes)),
   TPR = c(TPR_modelo, TPR_aleatorio),
   FPR = c(FPR_modelo, FPR_aleatorio)
+) 
+
+tibble(
+  TPR = TPR_modelo,
+  FPR = FPR_modelo
 ) %>%
-  ggplot(aes(x = FPR, y = TPR, color = tipo)) +
+  ggplot(aes(x = FPR, y = TPR)) +
   geom_line() +
-  geom_abline(slope = 1, intercept = 0, colour = "red")
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  theme_bw()
 ```
-
-### AUC
-
-AUC é a área sob a curva ROC. Vai de 0.5 a 1.
 
 ```{r}
-df %>%
-  summarise(auc_modelo = Metrics::auc(y, predito),
-            auc_aleatorio = Metrics::auc(y, runif(n())))
+m <- glm(decisao_bin ~ autor + unanime + 
+           n_movs + tempo + assunto + camara +
+           foro_origem, 
+         data = teste, family = binomial())
 ```
+
+
