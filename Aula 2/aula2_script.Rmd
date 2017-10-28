@@ -20,7 +20,6 @@ output: html_document
 knitr::include_graphics("ciclo_aula1.png")
 ```
 
-
 ## Exercícios da Aula 1. Dúvidas?
 
 ```{r}
@@ -46,7 +45,6 @@ d_infos %>%
 ```{r}
 library(forcats)
 library(stringr)
-
 d_infos %>%
   mutate(duracao = as.numeric(duracao),
          assunto_intermediario = assunto_intermediario %>% 
@@ -83,23 +81,25 @@ d_infos %>%
 knitr::include_graphics("ciclo_aula2.png")
 ```
 
-- Pré-processamentos
+<!-- ----------------------------------------------------------------------- -->
+
+## Plano de hoje
+
+<!-- 1h00' -->
+- setup
+- exercicios anteriores
+- revisao (principalmente ggplot2)
+- pré-processamentos
 - criação de variáveis
 
-<!-- 1h00' OK -->
-- Setup
-- Exercicios anteriores
-- Revisao (principalmente ggplot2)
-
-<!-- 1h30' OK -->
-- Conceitos
+<!-- 1h30' -->
 - erros de ajuste vs. erros de predição
 - Sobreajuste (Overfiting)
 
 <!-- 3h00' -->
 - regressão logística (nao esquecer de falar de formula)
     - ajustar um modelo
-    - mude a formula
+    - mudar a formula
 - árvore de decisão
     - ajustar um modelo
     - plotar a arvore
@@ -109,9 +109,7 @@ knitr::include_graphics("ciclo_aula2.png")
     - ajustar uma curva ROC
     - comparar acerto dos modelos usando vários critérios (AUC, acerto)
 
-<!-- ----------------------------------------------------------------------- -->
-
-<!-- 5h00' FALTA bagging, rf xgboost -->
+<!-- 5h00' -->
 - Validação cruzada (cross-validation)
 - regularização (LASSO)
 - bagging (conceituação teórica)
@@ -119,8 +117,7 @@ knitr::include_graphics("ciclo_aula2.png")
     - ajustar um lasso
 - random forest
     - ajustar um rf
-- xgboost
-    - ajustar um xgboost
+- Desafio!
 
 <!-- 6h00' OK -->
 - communicate
@@ -130,29 +127,19 @@ knitr::include_graphics("ciclo_aula2.png")
 
 <!-- ----------------------------------------------------------------------- -->
 
+## Arrumação da base
+
+### Base inicial (da aula 1)
 
 ```{r}
-d_infos %>% 
-  count(resultado, decisao_binaria)
+dataset <- read_rds("../Aula 1/data/d_cposg.rds")
 ```
 
+### Base das partes
 
-### Arrumação da base
-
+Nessa base, separamos os casos iniciados pelos acusados ou pelo Ministério Público. Também simplificamos os tipos de processos possíveis.
 
 ```{r}
-
-library(tidyverse)
-library(forcats)
-library(stringr)
-
-# processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
-# RAW
-# d_cjsg <- read_rds("data/d_cjsg.rds") %>% 
-#  mutate(n_processo = str_replace_all(n_processo, "[^0-9]", ""))
-
-dataset <- read_rds("../Aula 1/data/d_cposg.rds")
-
 partes <- dataset %>% 
   select(id, parts) %>% 
   unnest(parts) %>% 
@@ -173,7 +160,15 @@ partes <- dataset %>%
   janitor::clean_names() %>% 
   filter(!is.na(apelante)) %>% 
   select(id, autor = apelante)
+```
 
+### Base de informações
+
+A mesma da aula passada, com algumas modificações
+
+Exercício: comentar o código abaixo.
+
+```{r}
 informacoes <- dataset %>% 
   semi_join(partes, "id") %>% 
   select(id, data) %>% 
@@ -193,9 +188,22 @@ informacoes <- dataset %>%
                                "Extraordinaria", "Ordinaria")) %>% 
   mutate(num_camara = str_extract(distribuicao, "^[0-9]+"),
          num_camara = str_pad(num_camara, 2, "0", side = "left")) %>% 
-  select(id, assunto_intermediario, assunto, 
-         num_camara, tipo_camara, foro_origem, relator)
+  select(id, assunto, num_camara, tipo_camara, foro_origem, relator) %>%
+  replace_na(list(assunto = "nenhum")) %>%
+  mutate(assunto = case_when(
+    str_detect(assunto, "Tráfico de Drogas") ~ "Tráfico de drogas",
+    str_detect(assunto, "Posse de Drogas") ~ "Posse de drogas",
+    TRUE ~ as.character(assunto)
+  )) %>% 
+  mutate(assunto = fct_lump(assunto, 30),
+         relator = fct_lump(relator, 30))
+```
 
+### Base dos tempos
+
+Obtém a idade do processo.
+
+```{r}
 tempos <- dataset %>% 
   semi_join(partes, "id") %>% 
   select(id, movs) %>% 
@@ -203,11 +211,15 @@ tempos <- dataset %>%
   filter(movement < Sys.Date(), movement > as.Date("2000-01-01")) %>%
   group_by(id) %>% 
   summarise(n_movs = n(),
-            tempo = as.numeric(max(movement) - min(movement)),
             comeco = min(movement),
-            idade = Sys.Date() - comeco)
+            idade = as.numeric(Sys.Date() - comeco))
+```
 
-  
+### Base das decisoes
+
+Uma classificação um pouco mais sofisticada do que a da aula anterior. 
+
+```{r}
 # Varias regex
 re_vu <- regex("unanim|V\\.? ?U\\.?", ignore_case = TRUE)
 re_negaram <- regex("negaram|improc|improv|mantiv|não prov", ignore_case = TRUE)
@@ -249,76 +261,163 @@ decisoes <- dataset %>%
     )
   ) %>% 
   select(id, decisao_bin, decisao, autor, unanime, num_decision)
+```
 
+### Base de textos / ementas
 
+Nova base de dados! Utiliza as informações da base de dados de ementas.
+
+```{r}
+blacklist <- c(
+  "desprovido", "provido", "improvido", "apelo nao", "improcedente",
+  "provimento", "negado", "manutencao do decidido", "parcialmente", 
+  "parcial", "provimento", "mantidos", "mente", "acolhido", "mantida",
+  "absolvicao", "condenacao"
+) %>% str_c(collapse = "|")
+
+d_cjsg <- read_rds("data/d_cjsg.rds") %>%
+  mutate(id = str_replace_all(n_processo, "[^0-9]", "")) %>% 
+  filter(str_detect(classeassunto, "Apela")) %>% 
+  semi_join(decisoes, "id") %>% 
+  select(id, ementa) %>% 
+  distinct(id, .keep_all = TRUE) %>% 
+  # limpando o texto
+  mutate(ementa = ementa %>% 
+           str_to_lower() %>% 
+           tm::removeWords(tm::stopwords("pt")) %>% 
+           abjutils::rm_accent() %>% 
+           str_replace_all(blacklist, "") %>% 
+           str_replace_all("[[:space:]]+", " ")) %>% 
+  filter(!is.na(ementa))
+
+textos <- d_cjsg %>% 
+  tidytext::unnest_tokens(word, ementa, token = "ngrams", n = 2) %>% 
+  count(id, word) %>% 
+  group_by(word) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>% 
+  filter(n >= 500) %>% 
+  mutate(um = 1) %>% 
+  select(-n) %>% 
+  spread(word, um, fill = 0) %>% 
+  janitor::clean_names() %>% 
+  purrr::set_names(paste0("txt_", names(.))) %>% 
+  rename(id = txt_id)
+```
+
+### Dados finais
+
+Dados finais para ajustar modelo. Observe a parte dos fatores.
+
+```{r}
 d_final <- decisoes %>% 
   inner_join(tempos, "id") %>% 
   inner_join(informacoes, "id") %>% 
-  distinct(id, .keep_all = TRUE) %>% 
-  mutate(decisao_bin = factor(decisao_bin))
-```
-
-
-```{r}
-set.seed(10)
-treino <- d_final %>% 
-  sample_n(15000)
-teste <- d_final %>% 
-  anti_join(treino, "id")
-
-
-m <- glm(decisao_bin ~ autor + n_movs + tempo + assunto + 
-           num_camara * tipo_camara + foro_origem, 
-         data = teste, family = binomial())
-
-m %>% 
-  broom::augment(newdata = teste, type.predict = "response") %>% 
-  filter(!is.na(.fitted)) %>% 
-  mutate(res = if_else(.fitted > .5, "Favoravel", "Desfavoravel")) %>% 
-  summarise(prop = sum(res == decisao_bin) / n()) %>% 
-  with(prop)
-
-teste %>% 
-  count(decisao_bin) %>% 
-  mutate(prop = n/sum(n))
+  left_join(textos, "id") %>% 
+  mutate_at(vars(starts_with("txt_")), funs(if_else(is.na(.), 0, .))) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  select(decisao_bin, autor, n_movs, idade, assunto, 
+         num_camara, tipo_camara, foro_origem, relator,
+         starts_with("txt"))
 
 saveRDS(d_final, "data/d_final.rds")
-
 ```
 
+### Base de treino e base de teste
 
 ```{r}
-# dataset <- readr::read_rds("data/d_cposg.rds")
-# 
-# d_infos <- informacoes %>% 
-#   inner_join(decisoes) %>% 
-#   #inner_join(movs) %>% 
-#   filter(area == "Criminal",
-#          id %in% processos,
-#          !distribuicao %in% c("5ª Câmara de Direito Criminal D", "Órgão Especial"),
-#          situacao %in% c("Encerrado", "Julgado", "Transitado")
-#          # Tiramos o "administrativamente" porque são casos em que não há julgamento do mérito
-#          ) %>% 
-#   select(-x, -outros_numeros, -numeros_de_origem, -processo, -ultima_carga, -volume_apenso) %>% 
-#   rename(data_ultima_decisao = date,
-#          decisao = decision) %>% 
-#   mutate(data_ultima_decisao = format(data_ultima_decisao, "%d/%m/%Y")
-#          #data_dist = format(data_dist, "%d/%m/%Y")
-#   )
-# 
-# saveRDS(d_infos, 'data/infos_processos.rds')
-# saveRDS(movs,  'data/movs_processos.rds')
+d_final <- readRDS("data/d_final.rds")
+
+set.seed(19910401)
+treino_ids <- sample(seq_len(nrow(d_final)), 18000)
+treino <- d_final[treino_ids, ]
+teste <- d_final[-treino_ids, ]
 ```
 
-# Modelagem
+<!-- ----------------------------------------------------------------------- -->
 
+## Modelagem prática
 
+### O objeto formula
 
+`formula` é um tipo especial de objeto no R que ajuda muito na especificação dos modelos. Ela tem a forma `y ~ x1 + x2 + ... + xn` em que `y` é o nome da variável resposta e `x1, x2, ..., xn` são os nomes das variáveis que serão utilizadas como explicativas.
 
+```{r}
+f <- decisao_bin ~ autor + n_movs + idade + assunto + 
+           num_camara + tipo_camara + foro_origem + relator
+```
 
+### Modelo trivial
 
+```{r}
+# modelo trivial
 
-## O que é treinar o modelo?
+predizer <- function(x) "Desfavoravel"
+
+teste %>% 
+  mutate(res = predizer(.)) %>% 
+  summarise(prop = sum(res == decisao_bin) / n()) %>% 
+  pull(prop)
+```
+
+1. Exercício
+
+Por quê esse é o modelo mais simples que um agente racional poderia fazer?
+
+### Regressão logística
+
+```{r}
+logistica <- glm(f, data = treino, family = binomial())
+
+# taxa de acerto
+teste %>%
+  mutate(res = predict(logistica, newdata = ., type = "response"),
+         res = if_else(res > .5, "Favoravel", "Desfavoravel")) %>% 
+  summarise(prop = sum(res == decisao_bin) / n()) %>% 
+  pull(prop)
+```
+
+#### Exercício
+
+1. Tente mudar a formula adicionando ou tirando variáveis.
+
+2. Use as funções `summary` e `anova` para descobrir as variáveis mais importantes. O que está acontecendo com o summary?
+
+3. Teste a função `broom::tidy(logistica)` e explique o que ela faz.
+
+### Árvore de decisão
+
+```{r}
+# só para visualizar melhor
+treino_arvore <- treino %>% 
+  mutate(assunto = as.factor(as.numeric(assunto))) 
+teste_arvore <- teste %>% 
+  mutate(assunto = as.factor(as.numeric(assunto)))
+
+arvore <- rpart::rpart(decisao_bin ~ ., data = treino_arvore, 
+                       minsplit = 10, minbucket = 2, 
+                       xval = 30, cp = 0.005)
+
+rpart.plot::rpart.plot(arvore)
+
+# taxa de acerto
+teste_arvore %>% 
+  mutate(res = predict(arvore, newdata = ., type = "class")) %>% 
+  summarise(prop = sum(res == decisao_bin) / n()) %>% 
+  pull(prop)
+```
+
+#### Exercício
+
+1. Tente obter uma taxa de acerto maior mudando os parâmetros da árvore.
+
+2. Se você já está manjando tudo, veja as funções `plotcp` e `prune`.
+
+<!-- ----------------------------------------------------------------------- -->
+
+## Modelagem
+
+### O que é treinar o modelo?
 
 Encontrar uma função $f$ nesta equação:
 
@@ -332,7 +431,7 @@ em que:
 - $X$ são as informações que explicam: matriz de variáveis explicativas e
 - $\epsilon$ é um ruído aleatório.
 
-## Como obter uma f?
+### Como obter uma f?
 
 
 
@@ -355,7 +454,7 @@ Definimos uma estrutura genérica (modelo) para $f$ e ajustamos para os dados obt
 
 
 
-## Regressão linear
+### Regressão linear
 
 Suposição de que $f(X)$ é da forma:
 
@@ -363,7 +462,7 @@ $$
 f(X) = \alpha + \beta X
 $$
 
-## Regressão polinomial
+### Regressão polinomial
 
 Suposição de que $f(X)$ é da forma:
 
@@ -371,7 +470,7 @@ $$
 f(X) = \alpha + \beta_1 X + \beta_2 X^2 + ... + \beta_k X^k
 $$
 
-## Overfitting
+### Overfitting
 
 - Propósito da modelagem:
   - Construir um modelo que erre pouco
@@ -384,46 +483,37 @@ $$\text{Overfitting = baixo erro na amostra}\nRightarrow\text{baixo erro no mund
 
 
 
-# Exemplo
-
+## Exemplo
 
 ```{r}
-
-library(ggplot2)
-library(magrittr)
 set.seed(5)
-
 x <- runif(10)
 y <- 2*x + rnorm(10)
 ```
 
 
 $$Y = 2X + \epsilon$$
-```{r}
 
+```{r}
 data.frame(x = x, y = y) %>%
   ggplot(aes(x = x, y = y)) +
   geom_point() +
   geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +
   theme_bw()
-
 ```
 
 ```{r}
 # Como ajustar modelos lineares
-
 modelo_linear <- lm(y ~ x)
 ```
 
 ```{r}
 # Como extrair os valores preditos
-
 modelo_linear$fitted.values
 ```
 
 ```{r}
 # Erro observado
-
 mean((modelo_linear$fitted.values - y)^2)
 ```
 
@@ -433,8 +523,10 @@ Existe um modelo que erra menos na amostra?
 
 data.frame(x = x, y = y) %>%
   ggplot(aes(x = x, y = y)) +
-  geom_smooth(method = "lm", formula = y ~ poly(x, 9), color = "blue", se = FALSE) +
-  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 9), 
+              color = "blue", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ x, 
+              color = "red", se = FALSE) +
   theme_bw() +
   geom_point(size = 4)
 
@@ -442,7 +534,6 @@ data.frame(x = x, y = y) %>%
 
 ```{r}
 # Erro do modelo
-
 modelo_polinomial <- lm(y ~ poly(x, 9))
 mean((modelo_polinomial$fitted.values - y)^2)
 ```
@@ -458,11 +549,14 @@ dados_novos <- tibble(x_novo, y_novo)
 
 data.frame(x = x, y = y) %>%
   ggplot(aes(x = x, y = y)) +
-  geom_smooth(method = "lm", formula = y ~ poly(x, 9), color = "blue", se = FALSE) +
-  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 9), 
+              color = "blue", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ x, 
+              color = "red", se = FALSE) +
   theme_bw() +
   geom_point(size = 4) +
-  geom_point(aes(x = x_novo, y = y_novo), color = "orange", size = 4, data = dados_novos)
+  geom_point(aes(x = x_novo, y = y_novo), 
+             color = "orange", size = 4, data = dados_novos)
 ```
 
 ```{r}
@@ -479,7 +573,7 @@ Conclusão: Modelo complicados (demais) são piores do que modelos simples
 
 ## Como não deixar o modelo complicado (demais)?
 
-- Nessa bloco da aula:
+- Nesse bloco da aula:
     - Separe a base em dois pedaços e ajuste o modelo em um só
 - No próximo bloco da aula:
     - regularização
@@ -495,7 +589,7 @@ $$
 
 Quando $g$ é constante, o modelo parrudo equivale ao modelo linear simples.
 
-## Regressão Logística
+### Regressão Logística
 
 - Modelo parrudo e muito utilizado
 - $Y$ tem que estar em $\{0,1\}$
@@ -505,35 +599,21 @@ $$
 $$
 - $g(t) = \frac{\exp(t)}{1+\exp(t)}$
 
-### dados
+### Regressão parruda: glm
 
 ```{r}
-# Separando a nossa base em treino e teste
-set.seed(11071995)
-n <- 5000
-teste <- d_final %>% 
-  sample_n(n)
-
-treino <- d_final %>% 
-  anti_join(teste, by = 'id')
+m <- glm(decisao_bin ~ autor + n_movs + idade + 
+           assunto + num_camara + foro_origem, 
+         data = treino, family = binomial())
 ```
-
-## regressão parruda: glm
-
-```{r}
-m <- glm(decisao_bin ~ autor + unanime + 
-           n_movs + tempo + assunto + num_camara +
-           foro_origem, 
-         data = teste, family = binomial())
-```
-
 
 ## O que é um modelo bom?
 
 ```{r}
 # plugando o score na base
 teste <- teste %>%
-  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>% filter(!is.na(predito))
+  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>%
+  filter(!is.na(predito))
 ```
 
 classificar usando a média da base
@@ -542,6 +622,7 @@ classificar usando a média da base
 # tabela de confundimento
 teste <- teste %>%
   mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+
 tab_de_conf <- table(teste$decisao_bin, teste$classe_predita)
 tab_de_conf
 ```
@@ -575,7 +656,6 @@ acc
 - Curva ROC / AUC
 - (um monte de outras, mas menos comum)
 
-
 ## Área sobre a curva ROC
 
 ```{r}
@@ -597,13 +677,14 @@ tpr <- function(real, predito, corte = 0.5) {
 tnr <- function(real, predito, corte) {
   sum(predito <= corte & real == "Desfavoravel") / sum(real == "Desfavoravel")
 }
+
 with(teste, tpr(decisao_bin, predito, 0.5))
 with(teste, tnr(decisao_bin, predito, 0.5))
 ```
 
-Curva ROC
+### Curva ROC
 
-um monte de "matriz de confundimento". No exemplo, 100 delas.
+Um monte de "matrizes de confundimento". No exemplo, 100 delas.
 
 ```{r}
 df <- teste
@@ -612,8 +693,11 @@ cortes <- seq(0, 1, l = 100)
 TPR_modelo <- sapply(cortes, function(x) tpr(df$decisao_bin, df$predito, x))
 FPR_modelo <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, df$predito, x))
 
-TPR_aleatorio <- sapply(cortes, function(x) tpr(df$decisao_bin, rep(1, length(df$predito)), x))
-FPR_aleatorio <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, rep(1, length(df$predito)), x))
+TPR_aleatorio <- sapply(cortes, function(x) 
+  tpr(df$decisao_bin, rep(1, length(df$predito)), x))
+
+FPR_aleatorio <- sapply(cortes, function(x) 
+  1 - tnr(df$decisao_bin, rep(1, length(df$predito)), x))
 
 data.frame(
   tipo = rep(c("modelo", "aleatorio"), each = length(cortes)),
@@ -621,37 +705,42 @@ data.frame(
   FPR = c(FPR_modelo, FPR_aleatorio)
 ) 
 
-tibble(
-  TPR = TPR_modelo,
-  FPR = FPR_modelo
-) %>%
+tibble(TPR = TPR_modelo, FPR = FPR_modelo) %>%
   ggplot(aes(x = FPR, y = TPR)) +
   geom_line() +
   geom_abline(slope = 1, intercept = 0, colour = "red") +
   theme_bw()
 ```
 
+### Curva ROC nutella
+
 ```{r}
-set.seed(11071995)
-n <- 5000
-teste <- d_final %>% 
-  sample_n(n)
+pred <- predict(m, newdata = teste, type = "response")
+true <- as.numeric(teste$decisao_bin) - 1
 
-treino <- d_final %>% 
-  anti_join(teste, by = 'id')
+p_auc <- classifierplots::roc_plot(
+  test.y = as.numeric(df$decisao_bin) - 1,
+  pred.prob = df$predito) + 
+  theme_minimal(16)
+p_auc
+```
 
-m <- glm(decisao_bin ~ autor + unanime + 
-           n_movs + tempo + assunto + num_camara:tipo_camara + 
-           foro_origem, 
+### Adicionando outras covariáveis
+
+```{r}
+m <- glm(decisao_bin ~ autor + n_movs + idade + assunto + 
+           num_camara:tipo_camara + foro_origem, 
          data = teste, family = binomial())
 ```
 
 ```{r}
 teste <- teste %>%
-  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>% filter(!is.na(predito))
+  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>%
+  filter(!is.na(predito))
 
 teste <- teste %>%
   mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+
 tab_de_conf <- table(teste$decisao_bin, teste$classe_predita)
 tab_de_conf
 ```
@@ -663,87 +752,36 @@ acc
 
 ```{r}
 teste_com_mais_variaveis <- teste %>% 
-  mutate(assunto = ifelse(str_detect(assunto, "Homicídio|Latrocínio"), "Homicídio", assunto),
-         assunto = ifelse(str_detect(assunto, "Roubo"), "Roubo", assunto),
-         assunto = ifelse(str_detect(assunto, "Furto"), "Furto",
-                          assunto),
-         assunto = ifelse(str_detect(assunto, "Estupro"), "Esturpo", assunto),
-         assunto = ifelse(str_detect(assunto, "[tT]ráfico"), "Tráfico", assunto),
+  mutate(assunto = ifelse(str_detect(assunto, "Homicídio|Latrocínio"),
+                          "Homicídio", assunto),
+         assunto = ifelse(str_detect(assunto, "Roubo"), 
+                          "Roubo", assunto),
+         assunto = ifelse(str_detect(assunto, "Furto"), 
+                          "Furto", assunto),
+         assunto = ifelse(str_detect(assunto, "Estupro"), 
+                          "Esturpo", assunto),
+         assunto = ifelse(str_detect(assunto, "[tT]ráfico"), 
+                          "Tráfico", assunto),
          assunto = fct_lump(assunto, n = 10)) 
 ```
 
 ```{r}
-m <- glm(decisao_bin ~ autor + unanime + assunto + assunto:num_camara + n_movs + tempo + idade + num_decision, 
+m <- glm(decisao_bin ~ autor + assunto + assunto:num_camara + 
+           n_movs + idade, 
          data = teste_com_mais_variaveis, family = binomial())
 ```
 
 
 ```{r}
 teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
-  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>% filter(!is.na(predito))
+  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>%
+  filter(!is.na(predito))
 
 teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
   mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
-tab_de_conf <- table(teste_com_mais_variaveis$decisao_bin, teste_com_mais_variaveis$classe_predita)
-tab_de_conf
-```
 
-```{r}
-acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
-acc
-```
-
-```{r}
-with(teste_com_mais_variaveis, tpr(decisao_bin, predito, 0.5))
-with(teste_com_mais_variaveis, tnr(decisao_bin, predito, 0.5))
-```
-
-```{r}
-df <- teste
-
-cortes <- seq(0, 1, l = 100)
-TPR_modelo <- sapply(cortes, function(x) tpr(df$decisao_bin, df$predito, x))
-FPR_modelo <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, df$predito, x))
-
-TPR_aleatorio <- sapply(cortes, function(x) tpr(df$decisao_bin, rep(1, length(df$predito)), x))
-FPR_aleatorio <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, rep(1, length(df$predito)), x))
-
-data.frame(
-  tipo = rep(c("modelo", "aleatorio"), each = length(cortes)),
-  TPR = c(TPR_modelo, TPR_aleatorio),
-  FPR = c(FPR_modelo, FPR_aleatorio)
-) 
-
-roc_glm <- tibble(
-  TPR = TPR_modelo,
-  FPR = FPR_modelo
-)
-
-tibble(
-  TPR = TPR_modelo,
-  FPR = FPR_modelo
-) %>%
-  ggplot(aes(x = FPR, y = TPR)) +
-  geom_line() +
-  geom_abline(slope = 1, intercept = 0, colour = "red") +
-  theme_bw()
-```
-
-```{r}
-library(rpart)
-library(rpart.plot)
-
-arvore <- rpart(decisao_bin ~ autor + unanime + assunto + num_camara + n_movs + tempo + idade + num_decision, data = teste_com_mais_variaveis)
-rpart.plot(arvore)
-```
-
-```{r}
-teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
-  mutate(predito = predict(arvore, newdata = .)[,2]) %>% filter(!is.na(predito))
-
-teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
-  mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
-tab_de_conf <- table(teste_com_mais_variaveis$decisao_bin, teste_com_mais_variaveis$classe_predita)
+tab_de_conf <- table(teste_com_mais_variaveis$decisao_bin,
+                     teste_com_mais_variaveis$classe_predita)
 tab_de_conf
 ```
 
@@ -760,23 +798,112 @@ with(teste_com_mais_variaveis, tnr(decisao_bin, predito, 0.5))
 ```{r}
 df <- teste_com_mais_variaveis
 
-cortes <- seq(0, 1, l = 100)
-TPR_modelo <- sapply(cortes, function(x) tpr(df$decisao_bin, df$predito, x))
-FPR_modelo <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, df$predito, x))
-
-TPR_aleatorio <- sapply(cortes, function(x) tpr(df$decisao_bin, rep(1, length(df$predito)), x))
-FPR_aleatorio <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, rep(1, length(df$predito)), x))
-
-tibble(
-  TPR = TPR_modelo,
-  FPR = FPR_modelo,
-  modelo = "Árvore"
-) %>%
-  bind_rows(mutate(roc_glm, modelo = "GLM")) %>% 
-  ggplot(aes(x = FPR, y = TPR, color = modelo)) +
-  geom_line() +
-  #geom_abline(slope = 1, intercept = 0, colour = "red") +
-  theme_bw()
+p_auc <- classifierplots::roc_plot(
+  test.y = as.numeric(df$decisao_bin) - 1,
+  pred.prob = df$predito) + 
+  theme_minimal(16)
+p_auc
 ```
+
+
+
+```{r}
+arvore <- rpart::rpart(decisao_bin ~ autor + assunto + num_camara + 
+                         n_movs + idade, data = teste_com_mais_variaveis)
+rpart.plot::rpart.plot(arvore)
+```
+
+```{r}
+teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
+  mutate(predito = predict(arvore, newdata = .)[,2]) %>% 
+  filter(!is.na(predito))
+
+teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
+  mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+
+tab_de_conf <- table(teste_com_mais_variaveis$decisao_bin, teste_com_mais_variaveis$classe_predita)
+tab_de_conf
+```
+
+```{r}
+acc <- sum(diag(tab_de_conf)) / sum(tab_de_conf)
+acc
+```
+
+```{r}
+with(teste_com_mais_variaveis, tpr(decisao_bin, predito, 0.5))
+with(teste_com_mais_variaveis, tnr(decisao_bin, predito, 0.5))
+```
+
+```{r}
+pred <- predict(arvore, newdata = teste_com_mais_variaveis)[, 2]
+true <- as.numeric(teste$decisao_bin) - 1
+p_auc <- classifierplots::roc_plot(true, pred) +
+  theme_minimal(16)
+p_auc
+```
+
+
+<!-- ----------------------------------------------------------------------- -->
+
+# Regularização e bagging
+
+```{r}
+d_final <- readRDS("data/d_final.rds")
+
+set.seed(19910401)
+treino_ids <- sample(seq_len(nrow(d_final)), 18000)
+treino <- d_final[treino_ids, ]
+teste <- d_final[-treino_ids, ]
+```
+
+
+## Modelo LASSO
+
+```{r}
+X <- model.matrix(decisao_bin ~ ., data = treino)
+m <- glmnet::cv.glmnet(X, treino$decisao_bin, family = "binomial")
+
+X_new <- model.matrix(decisao_bin ~ ., data = select(teste, -id))
+
+teste %>% 
+  mutate(res = predict(m, newx = X_new, 
+                       s = "lambda.min", 
+                       type = "response")[,1]) %>% 
+  mutate(res = if_else(res > .5, "Favoravel", "Desfavoravel")) %>% 
+  summarise(prop = sum(res == decisao_bin) / n()) %>% 
+  pull(prop)
+```
+
+## Modelo de florestas aleatórias
+
+```{r}
+m <- randomForest::randomForest(decisao_bin ~ ., data = treino)
+teste %>% 
+  mutate(res = predict(m, newdata = teste, type = "class")) %>% 
+  summarise(prop = sum(res == decisao_bin) / n()) %>% 
+  pull(prop)
+```
+
+### Exercício
+
+1. Monte uma nova base de dados, com as mesmas explicativas, mas com a variável não-binarizada como resposta. Você pode tirar a categoria "outros" usando `filter` ou reclassificá-la usando `case_when`.
+
+2. Separe uma base de treino e uma base de teste.
+
+3. Ajuste um modelo de florestas aleatórias usando a base de treino.
+
+4. Construa a matriz de confusão na base de teste.
+
+5. Qual a taxa de acerto do modelo?
+
+6. Qual a taxa de acerto do modelo trivial?
+
+7. Conte-nos sobre os resultados obtidos.
+
+
+
+
+
 
 
