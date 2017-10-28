@@ -142,6 +142,8 @@ d_infos %>%
 
 ```{r}
 
+library(tidyverse)
+library(forcats)
 library(stringr)
 
 # processos <- readRDS("../Aula 1/data/processos_pra_pegar.rds")
@@ -198,10 +200,12 @@ tempos <- dataset %>%
   semi_join(partes, "id") %>% 
   select(id, movs) %>% 
   unnest(movs) %>% 
-  filter(movement < Sys.Date(), movement > as.Date("2000-01-01")) %>% 
+  filter(movement < Sys.Date(), movement > as.Date("2000-01-01")) %>%
   group_by(id) %>% 
   summarise(n_movs = n(),
-            tempo = as.numeric(max(movement) - min(movement)))
+            tempo = as.numeric(max(movement) - min(movement)),
+            comeco = min(movement),
+            idade = Sys.Date() - comeco)
 
   
 # Varias regex
@@ -221,6 +225,9 @@ decisoes <- dataset %>%
   inner_join(partes, "id") %>% 
   arrange(desc(date)) %>% 
   filter(!is.na(decision)) %>% 
+  group_by(id) %>% 
+  mutate(num_decision = n()) %>% 
+  ungroup() %>% 
   distinct(id, .keep_all = TRUE) %>% 
   mutate(
     unanime = if_else(str_detect(decision, re_vu), "Unanime", "Nao Unanime"),
@@ -241,7 +248,7 @@ decisoes <- dataset %>%
       TRUE ~ "Desfavoravel"
     )
   ) %>% 
-  select(id, decisao_bin, decisao, autor, unanime)
+  select(id, decisao_bin, decisao, autor, unanime, num_decision)
 
 
 d_final <- decisoes %>% 
@@ -255,7 +262,7 @@ d_final <- decisoes %>%
 ```{r}
 set.seed(10)
 treino <- d_final %>% 
-  sample_n(18000)
+  sample_n(15000)
 teste <- d_final %>% 
   anti_join(treino, "id")
 
@@ -503,7 +510,7 @@ $$
 ```{r}
 # Separando a nossa base em treino e teste
 set.seed(11071995)
-n <- 2000
+n <- 5000
 teste <- d_final %>% 
   sample_n(n)
 
@@ -515,7 +522,7 @@ treino <- d_final %>%
 
 ```{r}
 m <- glm(decisao_bin ~ autor + unanime + 
-           n_movs + tempo + assunto + camara +
+           n_movs + tempo + assunto + num_camara +
            foro_origem, 
          data = teste, family = binomial())
 ```
@@ -565,7 +572,6 @@ acc
 
 ## Alternativas para medir desempenho do modelo logístico
 
-- KS
 - Curva ROC / AUC
 - (um monte de outras, mas menos comum)
 
@@ -592,6 +598,7 @@ tnr <- function(real, predito, corte) {
   sum(predito <= corte & real == "Desfavoravel") / sum(real == "Desfavoravel")
 }
 with(teste, tpr(decisao_bin, predito, 0.5))
+with(teste, tnr(decisao_bin, predito, 0.5))
 ```
 
 Curva ROC
@@ -625,10 +632,151 @@ tibble(
 ```
 
 ```{r}
+set.seed(11071995)
+n <- 5000
+teste <- d_final %>% 
+  sample_n(n)
+
+treino <- d_final %>% 
+  anti_join(teste, by = 'id')
+
 m <- glm(decisao_bin ~ autor + unanime + 
-           n_movs + tempo + assunto + camara +
+           n_movs + tempo + assunto + num_camara:tipo_camara + 
            foro_origem, 
          data = teste, family = binomial())
+```
+
+```{r}
+teste <- teste %>%
+  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>% filter(!is.na(predito))
+
+teste <- teste %>%
+  mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+tab_de_conf <- table(teste$decisao_bin, teste$classe_predita)
+tab_de_conf
+```
+
+```{r}
+acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
+acc
+```
+
+```{r}
+teste_com_mais_variaveis <- teste %>% 
+  mutate(assunto = ifelse(str_detect(assunto, "Homicídio|Latrocínio"), "Homicídio", assunto),
+         assunto = ifelse(str_detect(assunto, "Roubo"), "Roubo", assunto),
+         assunto = ifelse(str_detect(assunto, "Furto"), "Furto",
+                          assunto),
+         assunto = ifelse(str_detect(assunto, "Estupro"), "Esturpo", assunto),
+         assunto = ifelse(str_detect(assunto, "[tT]ráfico"), "Tráfico", assunto),
+         assunto = fct_lump(assunto, n = 10)) 
+```
+
+```{r}
+m <- glm(decisao_bin ~ autor + unanime + assunto + assunto:num_camara + n_movs + tempo + idade + num_decision, 
+         data = teste_com_mais_variaveis, family = binomial())
+```
+
+
+```{r}
+teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
+  mutate(predito = as.vector(predict(m, newdata = ., type = "response"))) %>% filter(!is.na(predito))
+
+teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
+  mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+tab_de_conf <- table(teste_com_mais_variaveis$decisao_bin, teste_com_mais_variaveis$classe_predita)
+tab_de_conf
+```
+
+```{r}
+acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
+acc
+```
+
+```{r}
+with(teste_com_mais_variaveis, tpr(decisao_bin, predito, 0.5))
+with(teste_com_mais_variaveis, tnr(decisao_bin, predito, 0.5))
+```
+
+```{r}
+df <- teste
+
+cortes <- seq(0, 1, l = 100)
+TPR_modelo <- sapply(cortes, function(x) tpr(df$decisao_bin, df$predito, x))
+FPR_modelo <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, df$predito, x))
+
+TPR_aleatorio <- sapply(cortes, function(x) tpr(df$decisao_bin, rep(1, length(df$predito)), x))
+FPR_aleatorio <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, rep(1, length(df$predito)), x))
+
+data.frame(
+  tipo = rep(c("modelo", "aleatorio"), each = length(cortes)),
+  TPR = c(TPR_modelo, TPR_aleatorio),
+  FPR = c(FPR_modelo, FPR_aleatorio)
+) 
+
+roc_glm <- tibble(
+  TPR = TPR_modelo,
+  FPR = FPR_modelo
+)
+
+tibble(
+  TPR = TPR_modelo,
+  FPR = FPR_modelo
+) %>%
+  ggplot(aes(x = FPR, y = TPR)) +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, colour = "red") +
+  theme_bw()
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+arvore <- rpart(decisao_bin ~ autor + unanime + assunto + num_camara + n_movs + tempo + idade + num_decision, data = teste_com_mais_variaveis)
+rpart.plot(arvore)
+```
+
+```{r}
+teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
+  mutate(predito = predict(arvore, newdata = .)[,2]) %>% filter(!is.na(predito))
+
+teste_com_mais_variaveis <- teste_com_mais_variaveis %>%
+  mutate(classe_predita = if_else(predito > 0.5, "Favoravel", "Desfavoravel"))
+tab_de_conf <- table(teste_com_mais_variaveis$decisao_bin, teste_com_mais_variaveis$classe_predita)
+tab_de_conf
+```
+
+```{r}
+acc <- sum(diag(tab_de_conf))/sum(tab_de_conf)
+acc
+```
+
+```{r}
+with(teste_com_mais_variaveis, tpr(decisao_bin, predito, 0.5))
+with(teste_com_mais_variaveis, tnr(decisao_bin, predito, 0.5))
+```
+
+```{r}
+df <- teste_com_mais_variaveis
+
+cortes <- seq(0, 1, l = 100)
+TPR_modelo <- sapply(cortes, function(x) tpr(df$decisao_bin, df$predito, x))
+FPR_modelo <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, df$predito, x))
+
+TPR_aleatorio <- sapply(cortes, function(x) tpr(df$decisao_bin, rep(1, length(df$predito)), x))
+FPR_aleatorio <- sapply(cortes, function(x) 1-tnr(df$decisao_bin, rep(1, length(df$predito)), x))
+
+tibble(
+  TPR = TPR_modelo,
+  FPR = FPR_modelo,
+  modelo = "Árvore"
+) %>%
+  bind_rows(mutate(roc_glm, modelo = "GLM")) %>% 
+  ggplot(aes(x = FPR, y = TPR, color = modelo)) +
+  geom_line() +
+  #geom_abline(slope = 1, intercept = 0, colour = "red") +
+  theme_bw()
 ```
 
 
